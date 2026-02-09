@@ -38,8 +38,7 @@
     "postbuild": "chmod +x dist/index.js",
     "dev": "tsdown --watch",
     "typecheck": "tsc --noEmit",
-    "release": "bumpp --tag 'mcp-v%s' --commit 'chore(mcp): release v%s' && git push --follow-tags",
-    "sync": "bash scripts/sync-public-repo.sh"
+    "release": "bumpp --tag 'mcp-v%s' --commit 'chore(mcp): release v%s' && git push --follow-tags"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
