@@ -1,0 +1,54 @@
+{
+  "name": "@gaffer-sh/mcp",
+  "type": "module",
+  "version": "0.4.2",
+  "description": "MCP server for Gaffer test history - give your AI assistant memory of your tests",
+  "license": "MIT",
+  "author": "Gaffer <hello@gaffer.sh>",
+  "homepage": "https://gaffer.sh",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gaffer-sh/mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/gaffer-sh/mcp/issues"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "gaffer",
+    "test-results",
+    "claude",
+    "cursor",
+    "ai-assistant"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "gaffer-mcp": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "postbuild": "chmod +x dist/index.js",
+    "dev": "tsdown --watch",
+    "typecheck": "tsc --noEmit",
+    "release": "bumpp --tag 'mcp-v%s' --commit 'chore(mcp): release v%s' && git push --follow-tags",
+    "sync": "bash scripts/sync-public-repo.sh"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "bumpp": "^10.1.0",
+    "tsdown": "^0.20.3",
+    "typescript": "^5.7.2"
+  }
+}
