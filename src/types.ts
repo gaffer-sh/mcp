@@ -82,6 +82,7 @@ export interface FlakyTest {
   flipCount: number
   totalRuns: number
   lastSeen: string
+  flakinessScore: number
 }
 
 export interface FlakyTestsResponse {

@@ -41,6 +41,7 @@ export const getFlakyTestsOutputSchema = {
     flipCount: z.number(),
     totalRuns: z.number(),
     lastSeen: z.string(),
+    flakinessScore: z.number(),
   })),
   summary: z.object({
     threshold: z.number(),
@@ -63,6 +64,7 @@ export interface GetFlakyTestsOutput {
     flipCount: number
     totalRuns: number
     lastSeen: string
+    flakinessScore: number
   }>
   summary: {
     threshold: number
@@ -102,16 +104,18 @@ export const getFlakyTestsMetadata = {
 When using a user API Key (gaf_), you must provide a projectId.
 Use list_projects first to find available project IDs.
 
-A test is considered flaky if it frequently switches between pass and fail states
-(high "flip rate"). This helps identify unreliable tests that need attention.
+A test is considered flaky if it frequently switches between pass and fail states.
+Tests are ranked by a composite flakinessScore that factors in flip behavior,
+failure rate, and duration variability.
 
 Returns:
-- List of flaky tests with:
+- List of flaky tests sorted by flakinessScore (most flaky first), with:
   - name: Test name
   - flipRate: How often the test flips between pass/fail (0-1)
   - flipCount: Number of status transitions
   - totalRuns: Total test executions analyzed
   - lastSeen: When the test last ran
+  - flakinessScore: Composite score (0-1) combining flip proximity, failure rate, and duration variability
 - Summary with threshold used and total count
 
 Use this after get_project_health shows flaky tests exist, to identify which
