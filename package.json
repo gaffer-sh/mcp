@@ -1,7 +1,7 @@
 {
   "name": "@gaffer-sh/mcp",
   "type": "module",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "MCP server for Gaffer test history - give your AI assistant memory of your tests",
   "license": "MIT",
   "author": "Gaffer <hello@gaffer.sh>",
