@@ -8,7 +8,8 @@ import { z } from 'zod'
 export const compareTestMetricsInputSchema = {
   projectId: z
     .string()
-    .describe('Project ID. Use list_projects to find project IDs.'),
+    .optional()
+    .describe('Project ID. Required for user API keys (gaf_). Not needed for project tokens — omit and it resolves automatically.'),
   testName: z
     .string()
     .describe('The test name to compare. Can be the short name or full name including describe blocks.'),
@@ -59,7 +60,7 @@ export const compareTestMetricsOutputSchema = {
 }
 
 export interface CompareTestMetricsInput {
-  projectId: string
+  projectId?: string
   testName: string
   beforeCommit?: string
   afterCommit?: string

@@ -8,7 +8,8 @@ import { z } from 'zod'
 export const getSlowestTestsInputSchema = {
   projectId: z
     .string()
-    .describe('Project ID. Use list_projects to find project IDs.'),
+    .optional()
+    .describe('Project ID. Required for user API keys (gaf_). Not needed for project tokens — omit and it resolves automatically.'),
   days: z
     .number()
     .int()
@@ -55,7 +56,7 @@ export const getSlowestTestsOutputSchema = {
 }
 
 export interface GetSlowestTestsInput {
-  projectId: string
+  projectId?: string
   days?: number
   limit?: number
   framework?: string

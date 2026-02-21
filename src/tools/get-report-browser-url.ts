@@ -7,7 +7,8 @@ import { z } from 'zod'
 export const getReportBrowserUrlInputSchema = {
   projectId: z
     .string()
-    .describe('Project ID. Use list_projects to find project IDs.'),
+    .optional()
+    .describe('Project ID. Required for user API keys (gaf_). Not needed for project tokens — omit and it resolves automatically.'),
   testRunId: z
     .string()
     .describe('The test run ID to get the report URL for. Use list_test_runs to find test run IDs.'),
@@ -29,7 +30,7 @@ export const getReportBrowserUrlOutputSchema = {
 }
 
 export interface GetReportBrowserUrlInput {
-  projectId: string
+  projectId?: string
   testRunId: string
   filename?: string
 }

@@ -8,7 +8,8 @@ import { z } from 'zod'
 export const getFailureClustersInputSchema = {
   projectId: z
     .string()
-    .describe('Project ID. Use list_projects to find project IDs.'),
+    .optional()
+    .describe('Project ID. Required for user API keys (gaf_). Not needed for project tokens — omit and it resolves automatically.'),
   testRunId: z
     .string()
     .describe('Test run ID. Use list_test_runs to find test run IDs.'),
@@ -33,7 +34,7 @@ export const getFailureClustersOutputSchema = {
 }
 
 export interface GetFailureClustersInput {
-  projectId: string
+  projectId?: string
   testRunId: string
 }
 

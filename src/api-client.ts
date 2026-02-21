@@ -46,7 +46,7 @@ export type TokenType = 'user' | 'project'
 /**
  * Detect token type from prefix
  * - gaf_ = user API Key (read-only, cross-project)
- * - gfr_ = Project Upload Token (legacy, single project)
+ * - gfr_ = Project Token (single project)
  */
 export function detectTokenType(token: string): TokenType {
   if (token.startsWith('gaf_')) {
@@ -60,12 +60,16 @@ export function detectTokenType(token: string): TokenType {
  *
  * Supports two authentication modes:
  * 1. User API Keys (gaf_) - Read-only access to all user's projects
- * 2. Project Upload Tokens (gfr_) - Legacy, single project access
+ * 2. Project Tokens (gfr_) - Single project access, auto-resolves projectId
+ *
+ * All methods use the unified /user/projects/:id/ route tree.
+ * Project tokens auto-resolve their projectId via /project on first use.
  */
 export class GafferApiClient {
   private apiKey: string
   private baseUrl: string
   public readonly tokenType: TokenType
+  private resolvedProjectId: string | null = null
 
   constructor(config: GafferConfig) {
     this.apiKey = config.apiKey
@@ -77,7 +81,7 @@ export class GafferApiClient {
    * Create client from environment variables
    *
    * Supports:
-   * - GAFFER_API_KEY (for user API Keys gaf_)
+   * - GAFFER_API_KEY (for user API Keys gaf_ or project tokens gfr_)
    */
   static fromEnv(): GafferApiClient {
     const apiKey = process.env.GAFFER_API_KEY
@@ -95,6 +99,30 @@ export class GafferApiClient {
    */
   isUserToken(): boolean {
     return this.tokenType === 'user'
+  }
+
+  /**
+   * Resolve the project ID for the current token.
+   * For project tokens, fetches from /project on first call and caches.
+   * For user tokens, requires explicit projectId.
+   */
+  async resolveProjectId(projectId?: string): Promise<string> {
+    if (projectId) {
+      return projectId
+    }
+
+    if (this.isUserToken()) {
+      throw new Error('projectId is required when using a user API Key')
+    }
+
+    // Project token: resolve from /project endpoint (cached)
+    if (this.resolvedProjectId) {
+      return this.resolvedProjectId
+    }
+
+    const response = await this.request<{ project: { id: string } }>('/project')
+    this.resolvedProjectId = response.project.id
+    return this.resolvedProjectId
   }
 
   /**
@@ -187,13 +215,8 @@ export class GafferApiClient {
   }
 
   /**
-   * List all projects the user has access to
-   * Requires user API Key (gaf_)
-   *
-   * @param options - Query options
-   * @param options.organizationId - Filter by organization ID
-   * @param options.limit - Maximum number of results
-   * @param options.offset - Offset for pagination
+   * List all projects the user has access to.
+   * Requires user API Key (gaf_). Not available with project tokens.
    */
   async listProjects(options: {
     organizationId?: string
@@ -213,38 +236,19 @@ export class GafferApiClient {
 
   /**
    * Get project health analytics
-   *
-   * @param options - Query options
-   * @param options.projectId - Required for user tokens, ignored for project tokens
-   * @param options.days - Analysis period in days (default: 30)
    */
   async getProjectHealth(options: {
     projectId?: string
     days?: number
   } = {}): Promise<AnalyticsResponse> {
-    if (this.isUserToken()) {
-      if (!options.projectId) {
-        throw new Error('projectId is required when using a user API Key')
-      }
-      return this.request<AnalyticsResponse>(`/user/projects/${options.projectId}/health`, {
-        days: options.days || 30,
-      })
-    }
-
-    // Legacy: project token uses /project/analytics
-    return this.request<AnalyticsResponse>('/project/analytics', {
+    const projectId = await this.resolveProjectId(options.projectId)
+    return this.request<AnalyticsResponse>(`/user/projects/${projectId}/health`, {
       days: options.days || 30,
     })
   }
 
   /**
    * Get test history for a specific test
-   *
-   * @param options - Query options
-   * @param options.projectId - Required for user tokens, ignored for project tokens
-   * @param options.testName - Test name to search for
-   * @param options.filePath - File path to search for
-   * @param options.limit - Maximum number of results
    */
   async getTestHistory(options: {
     projectId?: string
@@ -259,19 +263,8 @@ export class GafferApiClient {
       throw new Error('Either testName or filePath is required (and must not be empty)')
     }
 
-    if (this.isUserToken()) {
-      if (!options.projectId) {
-        throw new Error('projectId is required when using a user API Key')
-      }
-      return this.request<TestHistoryResponse>(`/user/projects/${options.projectId}/test-history`, {
-        ...(testName && { testName }),
-        ...(filePath && { filePath }),
-        ...(options.limit && { limit: options.limit }),
-      })
-    }
-
-    // Legacy: project token uses /project/test-history
-    return this.request<TestHistoryResponse>('/project/test-history', {
+    const projectId = await this.resolveProjectId(options.projectId)
+    return this.request<TestHistoryResponse>(`/user/projects/${projectId}/test-history`, {
       ...(testName && { testName }),
       ...(filePath && { filePath }),
       ...(options.limit && { limit: options.limit }),
@@ -280,12 +273,6 @@ export class GafferApiClient {
 
   /**
    * Get flaky tests for the project
-   *
-   * @param options - Query options
-   * @param options.projectId - Required for user tokens, ignored for project tokens
-   * @param options.threshold - Minimum flip rate to be considered flaky (0-1)
-   * @param options.limit - Maximum number of results
-   * @param options.days - Analysis period in days
    */
   async getFlakyTests(options: {
     projectId?: string
@@ -293,19 +280,8 @@ export class GafferApiClient {
     limit?: number
     days?: number
   } = {}): Promise<FlakyTestsResponse> {
-    if (this.isUserToken()) {
-      if (!options.projectId) {
-        throw new Error('projectId is required when using a user API Key')
-      }
-      return this.request<FlakyTestsResponse>(`/user/projects/${options.projectId}/flaky-tests`, {
-        ...(options.threshold && { threshold: options.threshold }),
-        ...(options.limit && { limit: options.limit }),
-        ...(options.days && { days: options.days }),
-      })
-    }
-
-    // Legacy: project token uses /project/flaky-tests
-    return this.request<FlakyTestsResponse>('/project/flaky-tests', {
+    const projectId = await this.resolveProjectId(options.projectId)
+    return this.request<FlakyTestsResponse>(`/user/projects/${projectId}/flaky-tests`, {
       ...(options.threshold && { threshold: options.threshold }),
       ...(options.limit && { limit: options.limit }),
       ...(options.days && { days: options.days }),
@@ -314,13 +290,6 @@ export class GafferApiClient {
 
   /**
    * List test runs for the project
-   *
-   * @param options - Query options
-   * @param options.projectId - Required for user tokens, ignored for project tokens
-   * @param options.commitSha - Filter by commit SHA
-   * @param options.branch - Filter by branch name
-   * @param options.status - Filter by status ('passed' or 'failed')
-   * @param options.limit - Maximum number of results
    */
   async getTestRuns(options: {
     projectId?: string
@@ -329,20 +298,8 @@ export class GafferApiClient {
     status?: 'passed' | 'failed'
     limit?: number
   } = {}): Promise<TestRunsResponse> {
-    if (this.isUserToken()) {
-      if (!options.projectId) {
-        throw new Error('projectId is required when using a user API Key')
-      }
-      return this.request<TestRunsResponse>(`/user/projects/${options.projectId}/test-runs`, {
-        ...(options.commitSha && { commitSha: options.commitSha }),
-        ...(options.branch && { branch: options.branch }),
-        ...(options.status && { status: options.status }),
-        ...(options.limit && { limit: options.limit }),
-      })
-    }
-
-    // Legacy: project token uses /project/test-runs
-    return this.request<TestRunsResponse>('/project/test-runs', {
+    const projectId = await this.resolveProjectId(options.projectId)
+    return this.request<TestRunsResponse>(`/user/projects/${projectId}/test-runs`, {
       ...(options.commitSha && { commitSha: options.commitSha }),
       ...(options.branch && { branch: options.branch }),
       ...(options.status && { status: options.status }),
@@ -352,13 +309,10 @@ export class GafferApiClient {
 
   /**
    * Get report files for a test run
-   *
-   * @param testRunId - The test run ID
-   * @returns Report metadata with download URLs for each file
    */
   async getReport(testRunId: string): Promise<ReportResponse> {
     if (!this.isUserToken()) {
-      throw new Error('getReport requires a user API Key (gaf_). Upload Tokens (gfr_) cannot access reports via API.')
+      throw new Error('getReport requires a user API Key (gaf_). Project tokens (gfr_) cannot access reports via API.')
     }
 
     if (!testRunId) {
@@ -370,31 +324,16 @@ export class GafferApiClient {
 
   /**
    * Get slowest tests for a project
-   *
-   * @param options - Query options
-   * @param options.projectId - The project ID (required)
-   * @param options.days - Analysis period in days (default: 30)
-   * @param options.limit - Maximum number of results (default: 20)
-   * @param options.framework - Filter by test framework
-   * @param options.branch - Filter by git branch name
-   * @returns Slowest tests sorted by P95 duration
    */
   async getSlowestTests(options: {
-    projectId: string
+    projectId?: string
     days?: number
     limit?: number
     framework?: string
     branch?: string
   }): Promise<SlowestTestsResponse> {
-    if (!this.isUserToken()) {
-      throw new Error('getSlowestTests requires a user API Key (gaf_).')
-    }
-
-    if (!options.projectId) {
-      throw new Error('projectId is required')
-    }
-
-    return this.request<SlowestTestsResponse>(`/user/projects/${options.projectId}/slowest-tests`, {
+    const projectId = await this.resolveProjectId(options.projectId)
+    return this.request<SlowestTestsResponse>(`/user/projects/${projectId}/slowest-tests`, {
       ...(options.days && { days: options.days }),
       ...(options.limit && { limit: options.limit }),
       ...(options.framework && { framework: options.framework }),
@@ -404,36 +343,21 @@ export class GafferApiClient {
 
   /**
    * Get parsed test results for a specific test run
-   *
-   * @param options - Query options
-   * @param options.projectId - The project ID (required)
-   * @param options.testRunId - The test run ID (required)
-   * @param options.status - Filter by test status ('passed', 'failed', 'skipped')
-   * @param options.limit - Maximum number of results (default: 100)
-   * @param options.offset - Pagination offset (default: 0)
-   * @returns Parsed test cases with pagination
    */
   async getTestRunDetails(options: {
-    projectId: string
+    projectId?: string
     testRunId: string
     status?: 'passed' | 'failed' | 'skipped'
     limit?: number
     offset?: number
   }): Promise<TestRunDetailsResponse> {
-    if (!this.isUserToken()) {
-      throw new Error('getTestRunDetails requires a user API Key (gaf_).')
-    }
-
-    if (!options.projectId) {
-      throw new Error('projectId is required')
-    }
-
     if (!options.testRunId) {
       throw new Error('testRunId is required')
     }
 
+    const projectId = await this.resolveProjectId(options.projectId)
     return this.request<TestRunDetailsResponse>(
-      `/user/projects/${options.projectId}/test-runs/${options.testRunId}/details`,
+      `/user/projects/${projectId}/test-runs/${options.testRunId}/details`,
       {
         ...(options.status && { status: options.status }),
         ...(options.limit && { limit: options.limit }),
@@ -444,38 +368,22 @@ export class GafferApiClient {
 
   /**
    * Compare test metrics between two commits or test runs
-   *
-   * @param options - Query options
-   * @param options.projectId - The project ID (required)
-   * @param options.testName - The test name to compare (required)
-   * @param options.beforeCommit - Commit SHA for before (use with afterCommit)
-   * @param options.afterCommit - Commit SHA for after (use with beforeCommit)
-   * @param options.beforeRunId - Test run ID for before (use with afterRunId)
-   * @param options.afterRunId - Test run ID for after (use with beforeRunId)
-   * @returns Comparison of test metrics
    */
   async compareTestMetrics(options: {
-    projectId: string
+    projectId?: string
     testName: string
     beforeCommit?: string
     afterCommit?: string
     beforeRunId?: string
     afterRunId?: string
   }): Promise<CompareTestResponse> {
-    if (!this.isUserToken()) {
-      throw new Error('compareTestMetrics requires a user API Key (gaf_).')
-    }
-
-    if (!options.projectId) {
-      throw new Error('projectId is required')
-    }
-
     if (!options.testName) {
       throw new Error('testName is required')
     }
 
+    const projectId = await this.resolveProjectId(options.projectId)
     return this.request<CompareTestResponse>(
-      `/user/projects/${options.projectId}/compare-test`,
+      `/user/projects/${projectId}/compare-test`,
       {
         testName: options.testName,
         ...(options.beforeCommit && { beforeCommit: options.beforeCommit }),
@@ -488,26 +396,14 @@ export class GafferApiClient {
 
   /**
    * Get coverage summary for a project
-   *
-   * @param options - Query options
-   * @param options.projectId - The project ID (required)
-   * @param options.days - Analysis period in days (default: 30)
-   * @returns Coverage summary with trends and lowest coverage files
    */
   async getCoverageSummary(options: {
-    projectId: string
+    projectId?: string
     days?: number
   }): Promise<CoverageSummaryResponse> {
-    if (!this.isUserToken()) {
-      throw new Error('getCoverageSummary requires a user API Key (gaf_).')
-    }
-
-    if (!options.projectId) {
-      throw new Error('projectId is required')
-    }
-
+    const projectId = await this.resolveProjectId(options.projectId)
     return this.request<CoverageSummaryResponse>(
-      `/user/projects/${options.projectId}/coverage-summary`,
+      `/user/projects/${projectId}/coverage-summary`,
       {
         ...(options.days && { days: options.days }),
       },
@@ -516,20 +412,9 @@ export class GafferApiClient {
 
   /**
    * Get coverage files for a project with filtering
-   *
-   * @param options - Query options
-   * @param options.projectId - The project ID (required)
-   * @param options.filePath - Filter to specific file path
-   * @param options.minCoverage - Minimum coverage percentage
-   * @param options.maxCoverage - Maximum coverage percentage
-   * @param options.limit - Maximum number of results
-   * @param options.offset - Pagination offset
-   * @param options.sortBy - Sort by 'path' or 'coverage'
-   * @param options.sortOrder - Sort order 'asc' or 'desc'
-   * @returns List of files with coverage data
    */
   async getCoverageFiles(options: {
-    projectId: string
+    projectId?: string
     filePath?: string
     minCoverage?: number
     maxCoverage?: number
@@ -538,16 +423,9 @@ export class GafferApiClient {
     sortBy?: 'path' | 'coverage'
     sortOrder?: 'asc' | 'desc'
   }): Promise<CoverageFilesResponse> {
-    if (!this.isUserToken()) {
-      throw new Error('getCoverageFiles requires a user API Key (gaf_).')
-    }
-
-    if (!options.projectId) {
-      throw new Error('projectId is required')
-    }
-
+    const projectId = await this.resolveProjectId(options.projectId)
     return this.request<CoverageFilesResponse>(
-      `/user/projects/${options.projectId}/coverage/files`,
+      `/user/projects/${projectId}/coverage/files`,
       {
         ...(options.filePath && { filePath: options.filePath }),
         ...(options.minCoverage !== undefined && { minCoverage: options.minCoverage }),
@@ -562,28 +440,15 @@ export class GafferApiClient {
 
   /**
    * Get risk areas (files with low coverage AND test failures)
-   *
-   * @param options - Query options
-   * @param options.projectId - The project ID (required)
-   * @param options.days - Analysis period in days (default: 30)
-   * @param options.coverageThreshold - Include files below this coverage (default: 80)
-   * @returns List of risk areas sorted by risk score
    */
   async getCoverageRiskAreas(options: {
-    projectId: string
+    projectId?: string
     days?: number
     coverageThreshold?: number
   }): Promise<CoverageRiskAreasResponse> {
-    if (!this.isUserToken()) {
-      throw new Error('getCoverageRiskAreas requires a user API Key (gaf_).')
-    }
-
-    if (!options.projectId) {
-      throw new Error('projectId is required')
-    }
-
+    const projectId = await this.resolveProjectId(options.projectId)
     return this.request<CoverageRiskAreasResponse>(
-      `/user/projects/${options.projectId}/coverage/risk-areas`,
+      `/user/projects/${projectId}/coverage/risk-areas`,
       {
         ...(options.days && { days: options.days }),
         ...(options.coverageThreshold !== undefined && { coverageThreshold: options.coverageThreshold }),
@@ -593,32 +458,19 @@ export class GafferApiClient {
 
   /**
    * Get a browser-navigable URL for viewing a test report
-   *
-   * @param options - Query options
-   * @param options.projectId - The project ID (required)
-   * @param options.testRunId - The test run ID (required)
-   * @param options.filename - Specific file to open (default: index.html)
-   * @returns URL with signed token for browser access
    */
   async getReportBrowserUrl(options: {
-    projectId: string
+    projectId?: string
     testRunId: string
     filename?: string
   }): Promise<BrowserUrlResponse> {
-    if (!this.isUserToken()) {
-      throw new Error('getReportBrowserUrl requires a user API Key (gaf_).')
-    }
-
-    if (!options.projectId) {
-      throw new Error('projectId is required')
-    }
-
     if (!options.testRunId) {
       throw new Error('testRunId is required')
     }
 
+    const projectId = await this.resolveProjectId(options.projectId)
     return this.request<BrowserUrlResponse>(
-      `/user/projects/${options.projectId}/reports/${options.testRunId}/browser-url`,
+      `/user/projects/${projectId}/reports/${options.testRunId}/browser-url`,
       {
         ...(options.filename && { filename: options.filename }),
       },
@@ -627,61 +479,34 @@ export class GafferApiClient {
 
   /**
    * Get failure clusters for a test run
-   *
-   * @param options - Query options
-   * @param options.projectId - The project ID (required)
-   * @param options.testRunId - The test run ID (required)
-   * @returns Failure clusters grouped by error similarity
    */
   async getFailureClusters(options: {
-    projectId: string
+    projectId?: string
     testRunId: string
   }): Promise<FailureClustersResponse> {
-    if (!this.isUserToken()) {
-      throw new Error('getFailureClusters requires a user API Key (gaf_).')
-    }
-
-    if (!options.projectId) {
-      throw new Error('projectId is required')
-    }
-
     if (!options.testRunId) {
       throw new Error('testRunId is required')
     }
 
+    const projectId = await this.resolveProjectId(options.projectId)
     return this.request<FailureClustersResponse>(
-      `/user/projects/${options.projectId}/test-runs/${options.testRunId}/failure-clusters`,
+      `/user/projects/${projectId}/test-runs/${options.testRunId}/failure-clusters`,
     )
   }
 
   /**
    * List upload sessions for a project
-   *
-   * @param options - Query options
-   * @param options.projectId - The project ID (required)
-   * @param options.commitSha - Filter by commit SHA
-   * @param options.branch - Filter by branch name
-   * @param options.limit - Maximum number of results (default: 10)
-   * @param options.offset - Pagination offset (default: 0)
-   * @returns Paginated list of upload sessions
    */
   async listUploadSessions(options: {
-    projectId: string
+    projectId?: string
     commitSha?: string
     branch?: string
     limit?: number
     offset?: number
   }): Promise<UploadSessionsResponse> {
-    if (!this.isUserToken()) {
-      throw new Error('listUploadSessions requires a user API Key (gaf_).')
-    }
-
-    if (!options.projectId) {
-      throw new Error('projectId is required')
-    }
-
+    const projectId = await this.resolveProjectId(options.projectId)
     return this.request<UploadSessionsResponse>(
-      `/user/projects/${options.projectId}/upload-sessions`,
+      `/user/projects/${projectId}/upload-sessions`,
       {
         ...(options.commitSha && { commitSha: options.commitSha }),
         ...(options.branch && { branch: options.branch }),
@@ -693,30 +518,18 @@ export class GafferApiClient {
 
   /**
    * Get upload session detail with linked results
-   *
-   * @param options - Query options
-   * @param options.projectId - The project ID (required)
-   * @param options.sessionId - The upload session ID (required)
-   * @returns Upload session details with linked test runs and coverage reports
    */
   async getUploadSessionDetail(options: {
-    projectId: string
+    projectId?: string
     sessionId: string
   }): Promise<UploadSessionDetailResponse> {
-    if (!this.isUserToken()) {
-      throw new Error('getUploadSessionDetail requires a user API Key (gaf_).')
-    }
-
-    if (!options.projectId) {
-      throw new Error('projectId is required')
-    }
-
     if (!options.sessionId) {
       throw new Error('sessionId is required')
     }
 
+    const projectId = await this.resolveProjectId(options.projectId)
     return this.request<UploadSessionDetailResponse>(
-      `/user/projects/${options.projectId}/upload-sessions/${options.sessionId}`,
+      `/user/projects/${projectId}/upload-sessions/${options.sessionId}`,
     )
   }
 }

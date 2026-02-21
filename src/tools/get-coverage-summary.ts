@@ -7,7 +7,8 @@ import { z } from 'zod'
 export const getCoverageSummaryInputSchema = {
   projectId: z
     .string()
-    .describe('Project ID. Use list_projects to find project IDs.'),
+    .optional()
+    .describe('Project ID. Required for user API keys (gaf_). Not needed for project tokens — omit and it resolves automatically.'),
   days: z
     .number()
     .int()
@@ -41,7 +42,7 @@ export const getCoverageSummaryOutputSchema = {
 }
 
 export interface GetCoverageSummaryInput {
-  projectId: string
+  projectId?: string
   days?: number
 }
 

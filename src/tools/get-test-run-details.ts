@@ -10,7 +10,8 @@ export const getTestRunDetailsInputSchema = {
     .describe('The test run ID to get details for. Use list_test_runs to find test run IDs.'),
   projectId: z
     .string()
-    .describe('Project ID. Use list_projects to find project IDs.'),
+    .optional()
+    .describe('Project ID. Required for user API keys (gaf_). Not needed for project tokens — omit and it resolves automatically.'),
   status: z
     .enum(['passed', 'failed', 'skipped'])
     .optional()
@@ -64,7 +65,7 @@ export const getTestRunDetailsOutputSchema = {
 
 export interface GetTestRunDetailsInput {
   testRunId: string
-  projectId: string
+  projectId?: string
   status?: 'passed' | 'failed' | 'skipped'
   limit?: number
   offset?: number

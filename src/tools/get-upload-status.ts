@@ -8,7 +8,8 @@ import { z } from 'zod'
 export const getUploadStatusInputSchema = {
   projectId: z
     .string()
-    .describe('Project ID. Use list_projects to find project IDs.'),
+    .optional()
+    .describe('Project ID. Required for user API keys (gaf_). Not needed for project tokens — omit and it resolves automatically.'),
   sessionId: z
     .string()
     .optional()
@@ -69,7 +70,7 @@ export const getUploadStatusOutputSchema = {
 }
 
 export interface GetUploadStatusInput {
-  projectId: string
+  projectId?: string
   sessionId?: string
   commitSha?: string
   branch?: string

@@ -7,7 +7,8 @@ import { z } from 'zod'
 export const getUntestedFilesInputSchema = {
   projectId: z
     .string()
-    .describe('Project ID. Use list_projects to find project IDs.'),
+    .optional()
+    .describe('Project ID. Required for user API keys (gaf_). Not needed for project tokens — omit and it resolves automatically.'),
   maxCoverage: z
     .number()
     .min(0)
@@ -51,7 +52,7 @@ export const getUntestedFilesOutputSchema = {
 }
 
 export interface GetUntestedFilesInput {
-  projectId: string
+  projectId?: string
   maxCoverage?: number
   limit?: number
 }

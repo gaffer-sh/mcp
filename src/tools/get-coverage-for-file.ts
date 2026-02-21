@@ -7,7 +7,8 @@ import { z } from 'zod'
 export const getCoverageForFileInputSchema = {
   projectId: z
     .string()
-    .describe('Project ID. Use list_projects to find project IDs.'),
+    .optional()
+    .describe('Project ID. Required for user API keys (gaf_). Not needed for project tokens — omit and it resolves automatically.'),
   filePath: z
     .string()
     .describe('File path to get coverage for. Can be exact path or partial match.'),
@@ -40,7 +41,7 @@ export const getCoverageForFileOutputSchema = {
 }
 
 export interface GetCoverageForFileInput {
-  projectId: string
+  projectId?: string
   filePath: string
 }
 

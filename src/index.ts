@@ -215,8 +215,8 @@ async function main() {
 ## Authentication
 
 ${client.isUserToken()
-    ? 'You have access to multiple projects. Use `list_projects` to find project IDs, then pass `projectId` to all tools.'
-    : 'Your token is scoped to a single project. Do NOT call `list_projects`. Do NOT pass `projectId` — it is resolved automatically. Note: some tools (coverage, failure clusters, slowest tests, etc.) require a user API key and are not available.'}
+  ? 'You have access to multiple projects. Use `list_projects` to find project IDs, then pass `projectId` to all tools.'
+  : 'Your token is scoped to a single project. Do NOT call `list_projects`. Do NOT pass `projectId` — it resolves automatically. All tools are available.'}
 
 ## Coverage Analysis Best Practices
 
