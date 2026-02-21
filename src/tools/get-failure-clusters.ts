@@ -11,7 +11,7 @@ export const getFailureClustersInputSchema = {
     .describe('Project ID. Use list_projects to find project IDs.'),
   testRunId: z
     .string()
-    .describe('Test run ID to get failure clusters for. Use list_test_runs to find test run IDs.'),
+    .describe('Test run ID. Use list_test_runs to find test run IDs.'),
 }
 
 /**
@@ -57,9 +57,6 @@ export const getFailureClustersMetadata = {
   name: 'get_failure_clusters',
   title: 'Get Failure Clusters',
   description: `Group failed tests by root cause using error message similarity.
-
-When using a user API Key (gaf_), you must provide a projectId.
-Use list_projects to find available project IDs, and list_test_runs to find test run IDs.
 
 Parameters:
 - projectId (required): The project ID

@@ -7,7 +7,7 @@ import { z } from 'zod'
 export const findUncoveredFailureAreasInputSchema = {
   projectId: z
     .string()
-    .describe('Project ID to analyze. Required. Use list_projects to find project IDs.'),
+    .describe('Project ID. Use list_projects to find project IDs.'),
   days: z
     .number()
     .int()
@@ -90,9 +90,6 @@ export const findUncoveredFailureAreasMetadata = {
 This cross-references test failures with coverage data to identify high-risk
 areas in your codebase that need attention. Files are ranked by a "risk score"
 calculated as: (100 - coverage%) × failureCount.
-
-When using a user API Key (gaf_), you must provide a projectId.
-Use list_projects first to find available project IDs.
 
 Parameters:
 - projectId: The project to analyze (required)

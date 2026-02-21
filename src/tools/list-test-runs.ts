@@ -8,7 +8,7 @@ export const listTestRunsInputSchema = {
   projectId: z
     .string()
     .optional()
-    .describe('Project ID to list test runs for. Required when using a user API Key (gaf_). Use list_projects to find project IDs.'),
+    .describe('Project ID. Required for user API keys (gaf_). Not needed for project tokens — omit and it resolves automatically.'),
   commitSha: z
     .string()
     .optional()
@@ -115,9 +115,6 @@ export const listTestRunsMetadata = {
   name: 'list_test_runs',
   title: 'List Test Runs',
   description: `List recent test runs for a project with optional filtering.
-
-When using a user API Key (gaf_), you must provide a projectId.
-Use list_projects first to find available project IDs.
 
 Filter by:
 - commitSha: Filter by commit SHA (supports prefix matching)

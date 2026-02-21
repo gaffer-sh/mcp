@@ -7,7 +7,7 @@ import { z } from 'zod'
 export const getReportBrowserUrlInputSchema = {
   projectId: z
     .string()
-    .describe('Project ID the test run belongs to. Required. Use list_projects to find project IDs.'),
+    .describe('Project ID. Use list_projects to find project IDs.'),
   testRunId: z
     .string()
     .describe('The test run ID to get the report URL for. Use list_test_runs to find test run IDs.'),
@@ -74,9 +74,6 @@ export const getReportBrowserUrlMetadata = {
 
 Returns a signed URL that can be opened directly in a browser without requiring
 the user to log in. The URL expires after 30 minutes for security.
-
-When using a user API Key (gaf_), you must provide both projectId and testRunId.
-Use list_projects and list_test_runs to find available IDs.
 
 Parameters:
 - projectId: The project the test run belongs to (required)

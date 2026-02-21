@@ -8,7 +8,7 @@ export const getFlakyTestsInputSchema = {
   projectId: z
     .string()
     .optional()
-    .describe('Project ID to get flaky tests for. Required when using a user API Key (gaf_). Use list_projects to find project IDs.'),
+    .describe('Project ID. Required for user API keys (gaf_). Not needed for project tokens — omit and it resolves automatically.'),
   threshold: z
     .number()
     .min(0)
@@ -100,9 +100,6 @@ export const getFlakyTestsMetadata = {
   name: 'get_flaky_tests',
   title: 'Get Flaky Tests',
   description: `Get the list of flaky tests in a project.
-
-When using a user API Key (gaf_), you must provide a projectId.
-Use list_projects first to find available project IDs.
 
 A test is considered flaky if it frequently switches between pass and fail states.
 Tests are ranked by a composite flakinessScore that factors in flip behavior,

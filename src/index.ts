@@ -212,6 +212,12 @@ async function main() {
     {
       instructions: `Gaffer provides test analytics and coverage data for your projects.
 
+## Authentication
+
+${client.isUserToken()
+    ? 'You have access to multiple projects. Use `list_projects` to find project IDs, then pass `projectId` to all tools.'
+    : 'Your token is scoped to a single project. Do NOT call `list_projects`. Do NOT pass `projectId` — it is resolved automatically. Note: some tools (coverage, failure clusters, slowest tests, etc.) require a user API key and are not available.'}
+
 ## Coverage Analysis Best Practices
 
 When helping users improve test coverage, combine coverage data with codebase exploration:
@@ -303,12 +309,14 @@ When an agent needs to know if CI results are ready:
     execute: executeListTestRuns,
   })
 
-  registerTool(server, client, {
-    metadata: listProjectsMetadata,
-    inputSchema: listProjectsInputSchema,
-    outputSchema: listProjectsOutputSchema,
-    execute: executeListProjects,
-  })
+  if (client.isUserToken()) {
+    registerTool(server, client, {
+      metadata: listProjectsMetadata,
+      inputSchema: listProjectsInputSchema,
+      outputSchema: listProjectsOutputSchema,
+      execute: executeListProjects,
+    })
+  }
 
   registerTool(server, client, {
     metadata: getReportMetadata,

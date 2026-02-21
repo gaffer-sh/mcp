@@ -7,7 +7,7 @@ import { z } from 'zod'
 export const getUntestedFilesInputSchema = {
   projectId: z
     .string()
-    .describe('Project ID to analyze. Required. Use list_projects to find project IDs.'),
+    .describe('Project ID. Use list_projects to find project IDs.'),
   maxCoverage: z
     .number()
     .min(0)
@@ -109,9 +109,6 @@ export const getUntestedFilesMetadata = {
 
 Returns files sorted by coverage percentage (lowest first), filtered
 to only include files below a coverage threshold.
-
-When using a user API Key (gaf_), you must provide a projectId.
-Use list_projects first to find available project IDs.
 
 Parameters:
 - projectId: The project to analyze (required)

@@ -8,7 +8,7 @@ import { z } from 'zod'
 export const getSlowestTestsInputSchema = {
   projectId: z
     .string()
-    .describe('Project ID to get slowest tests for. Required. Use list_projects to find project IDs.'),
+    .describe('Project ID. Use list_projects to find project IDs.'),
   days: z
     .number()
     .int()
@@ -104,9 +104,6 @@ export const getSlowestTestsMetadata = {
   name: 'get_slowest_tests',
   title: 'Get Slowest Tests',
   description: `Get the slowest tests in a project, sorted by P95 duration.
-
-When using a user API Key (gaf_), you must provide a projectId.
-Use list_projects first to find available project IDs.
 
 Parameters:
 - projectId (required): Project ID to analyze

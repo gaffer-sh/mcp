@@ -7,7 +7,7 @@ import { z } from 'zod'
 export const getCoverageForFileInputSchema = {
   projectId: z
     .string()
-    .describe('Project ID to get coverage for. Required. Use list_projects to find project IDs.'),
+    .describe('Project ID. Use list_projects to find project IDs.'),
   filePath: z
     .string()
     .describe('File path to get coverage for. Can be exact path or partial match.'),
@@ -87,9 +87,6 @@ export const getCoverageForFileMetadata = {
   name: 'get_coverage_for_file',
   title: 'Get Coverage for File',
   description: `Get coverage metrics for a specific file or files matching a path pattern.
-
-When using a user API Key (gaf_), you must provide a projectId.
-Use list_projects first to find available project IDs.
 
 Parameters:
 - projectId: The project to query (required)

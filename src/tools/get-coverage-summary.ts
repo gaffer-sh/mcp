@@ -7,7 +7,7 @@ import { z } from 'zod'
 export const getCoverageSummaryInputSchema = {
   projectId: z
     .string()
-    .describe('Project ID to get coverage for. Required. Use list_projects to find project IDs.'),
+    .describe('Project ID. Use list_projects to find project IDs.'),
   days: z
     .number()
     .int()
@@ -95,9 +95,6 @@ export const getCoverageSummaryMetadata = {
   name: 'get_coverage_summary',
   title: 'Get Coverage Summary',
   description: `Get the coverage metrics summary for a project.
-
-When using a user API Key (gaf_), you must provide a projectId.
-Use list_projects first to find available project IDs.
 
 Returns:
 - Current coverage percentages (lines, branches, functions)

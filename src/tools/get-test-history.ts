@@ -8,7 +8,7 @@ export const getTestHistoryInputSchema = {
   projectId: z
     .string()
     .optional()
-    .describe('Project ID to get test history for. Required when using a user API Key (gaf_). Use list_projects to find project IDs.'),
+    .describe('Project ID. Required for user API keys (gaf_). Not needed for project tokens — omit and it resolves automatically.'),
   testName: z
     .string()
     .optional()
@@ -116,9 +116,6 @@ export const getTestHistoryMetadata = {
   name: 'get_test_history',
   title: 'Get Test History',
   description: `Get the pass/fail history for a specific test.
-
-When using a user API Key (gaf_), you must provide a projectId.
-Use list_projects first to find available project IDs.
 
 Search by either:
 - testName: The exact name of the test (e.g., "should handle user login")

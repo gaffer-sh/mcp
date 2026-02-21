@@ -8,7 +8,7 @@ import { z } from 'zod'
 export const compareTestMetricsInputSchema = {
   projectId: z
     .string()
-    .describe('Project ID. Required when using a user API Key (gaf_). Use list_projects to find project IDs.'),
+    .describe('Project ID. Use list_projects to find project IDs.'),
   testName: z
     .string()
     .describe('The test name to compare. Can be the short name or full name including describe blocks.'),
@@ -119,9 +119,6 @@ export const compareTestMetricsMetadata = {
   description: `Compare test metrics between two commits or test runs.
 
 Useful for measuring the impact of code changes on test performance or reliability.
-
-When using a user API Key (gaf_), you must provide a projectId.
-Use list_projects to find available project IDs.
 
 Parameters:
 - projectId (required): Project ID

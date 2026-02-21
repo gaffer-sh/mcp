@@ -201,7 +201,7 @@ export class GafferApiClient {
     offset?: number
   } = {}): Promise<ProjectsResponse> {
     if (!this.isUserToken()) {
-      throw new Error('listProjects requires a user API Key (gaf_). Upload Tokens (gfr_) can only access a single project.')
+      throw new Error('list_projects is not available with project tokens (gfr_). Your token is already scoped to a single project — call tools directly without passing projectId.')
     }
 
     return this.request<ProjectsResponse>('/user/projects', {

@@ -10,7 +10,7 @@ export const getTestRunDetailsInputSchema = {
     .describe('The test run ID to get details for. Use list_test_runs to find test run IDs.'),
   projectId: z
     .string()
-    .describe('Project ID the test run belongs to. Required when using a user API Key (gaf_). Use list_projects to find project IDs.'),
+    .describe('Project ID. Use list_projects to find project IDs.'),
   status: z
     .enum(['passed', 'failed', 'skipped'])
     .optional()
@@ -133,9 +133,6 @@ export const getTestRunDetailsMetadata = {
   name: 'get_test_run_details',
   title: 'Get Test Run Details',
   description: `Get parsed test results for a specific test run.
-
-When using a user API Key (gaf_), you must provide a projectId.
-Use list_projects to find available project IDs, and list_test_runs to find test run IDs.
 
 Parameters:
 - testRunId (required): The test run ID to get details for

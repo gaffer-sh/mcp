@@ -8,7 +8,7 @@ export const getProjectHealthInputSchema = {
   projectId: z
     .string()
     .optional()
-    .describe('Project ID to get health for. Required when using a user API Key (gaf_). Use list_projects to find project IDs.'),
+    .describe('Project ID. Required for user API keys (gaf_). Not needed for project tokens — omit and it resolves automatically.'),
   days: z
     .number()
     .int()
@@ -84,9 +84,6 @@ export const getProjectHealthMetadata = {
   name: 'get_project_health',
   title: 'Get Project Health',
   description: `Get the health metrics for a project.
-
-When using a user API Key (gaf_), you must provide a projectId.
-Use list_projects first to find available project IDs.
 
 Returns:
 - Health score (0-100): Overall project health based on pass rate and trend
