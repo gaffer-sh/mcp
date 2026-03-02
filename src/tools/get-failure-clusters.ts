@@ -60,7 +60,7 @@ export const getFailureClustersMetadata = {
   description: `Group failed tests by root cause using error message similarity.
 
 Parameters:
-- projectId (required): The project ID
+- projectId (optional): Project ID — required for user API keys, auto-resolved for project tokens
 - testRunId (required): The test run ID to analyze
 
 Returns:

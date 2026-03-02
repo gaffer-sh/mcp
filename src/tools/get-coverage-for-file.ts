@@ -90,7 +90,7 @@ export const getCoverageForFileMetadata = {
   description: `Get coverage metrics for a specific file or files matching a path pattern.
 
 Parameters:
-- projectId: The project to query (required)
+- projectId (optional): Project ID — required for user API keys, auto-resolved for project tokens
 - filePath: File path to search for (exact or partial match)
 
 Returns:

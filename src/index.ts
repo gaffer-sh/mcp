@@ -1,102 +1,20 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
+import { z } from 'zod'
 import { GafferApiClient } from './api-client.js'
 import {
-  compareTestMetricsInputSchema,
-  compareTestMetricsMetadata,
-  compareTestMetricsOutputSchema,
-  executeCompareTestMetrics,
-} from './tools/compare-test-metrics.js'
-import {
-  executeFindUncoveredFailureAreas,
-  findUncoveredFailureAreasInputSchema,
-  findUncoveredFailureAreasMetadata,
-  findUncoveredFailureAreasOutputSchema,
-} from './tools/find-uncovered-failure-areas.js'
-import {
-  executeGetCoverageForFile,
-  getCoverageForFileInputSchema,
-  getCoverageForFileMetadata,
-  getCoverageForFileOutputSchema,
-} from './tools/get-coverage-for-file.js'
-import {
-  executeGetCoverageSummary,
-  getCoverageSummaryInputSchema,
-  getCoverageSummaryMetadata,
-  getCoverageSummaryOutputSchema,
-} from './tools/get-coverage-summary.js'
-import {
-  executeGetFailureClusters,
-  getFailureClustersInputSchema,
-  getFailureClustersMetadata,
-  getFailureClustersOutputSchema,
-} from './tools/get-failure-clusters.js'
-import {
-  executeGetFlakyTests,
-  getFlakyTestsInputSchema,
-  getFlakyTestsMetadata,
-  getFlakyTestsOutputSchema,
-} from './tools/get-flaky-tests.js'
-import {
-  executeGetProjectHealth,
-  getProjectHealthInputSchema,
-  getProjectHealthMetadata,
-  getProjectHealthOutputSchema,
-} from './tools/get-project-health.js'
-import {
-  executeGetReportBrowserUrl,
-  getReportBrowserUrlInputSchema,
-  getReportBrowserUrlMetadata,
-  getReportBrowserUrlOutputSchema,
-} from './tools/get-report-browser-url.js'
-import {
-  executeGetReport,
-  getReportInputSchema,
-  getReportMetadata,
-  getReportOutputSchema,
-} from './tools/get-report.js'
-import {
-  executeGetSlowestTests,
-  getSlowestTestsInputSchema,
-  getSlowestTestsMetadata,
-  getSlowestTestsOutputSchema,
-} from './tools/get-slowest-tests.js'
-import {
-  executeGetTestHistory,
-  getTestHistoryInputSchema,
-  getTestHistoryMetadata,
-  getTestHistoryOutputSchema,
-} from './tools/get-test-history.js'
-import {
-  executeGetTestRunDetails,
-  getTestRunDetailsInputSchema,
-  getTestRunDetailsMetadata,
-  getTestRunDetailsOutputSchema,
-} from './tools/get-test-run-details.js'
-import {
-  executeGetUntestedFiles,
-  getUntestedFilesInputSchema,
-  getUntestedFilesMetadata,
-  getUntestedFilesOutputSchema,
-} from './tools/get-untested-files.js'
-import {
-  executeGetUploadStatus,
-  getUploadStatusInputSchema,
-  getUploadStatusMetadata,
-  getUploadStatusOutputSchema,
-} from './tools/get-upload-status.js'
+  executeCode,
+  executeSearchTools,
+  FunctionRegistry,
+  registerAllTools,
+  searchToolsInputSchema,
+} from './codemode/index.js'
 import {
   executeListProjects,
   listProjectsInputSchema,
   listProjectsMetadata,
   listProjectsOutputSchema,
 } from './tools/list-projects.js'
-import {
-  executeListTestRuns,
-  listTestRunsInputSchema,
-  listTestRunsMetadata,
-  listTestRunsOutputSchema,
-} from './tools/list-test-runs.js'
 
 /**
  * Log error to stderr for observability
@@ -118,64 +36,32 @@ function logError(toolName: string, error: unknown): void {
 function handleToolError(toolName: string, error: unknown): { content: { type: 'text', text: string }[], isError: true } {
   logError(toolName, error)
   const message = error instanceof Error ? error.message : 'Unknown error'
+  const logs = Array.isArray((error as any)?.logs) ? (error as any).logs as string[] : undefined
+  const durationMs = typeof (error as any)?.durationMs === 'number' ? (error as any).durationMs : undefined
+
+  let text = `Error: ${message}`
+  if (logs?.length) {
+    text += `\n\nCaptured logs:\n${logs.join('\n')}`
+  }
+  if (durationMs !== undefined) {
+    text += `\n\nDuration: ${durationMs}ms`
+  }
+
   return {
-    content: [{ type: 'text' as const, text: `Error: ${message}` }],
+    content: [{ type: 'text' as const, text }],
     isError: true,
   }
 }
 
 /**
- * Tool definition for registration helper.
- * Schema types use `any` to accommodate the MCP SDK's complex Zod type requirements.
- */
-interface ToolDefinition<TInput, TOutput> {
-  metadata: { name: string, title: string, description: string }
-  inputSchema: any
-  outputSchema: any
-  execute: (client: GafferApiClient, input: TInput) => Promise<TOutput>
-}
-
-/**
- * Register a tool with the MCP server using a consistent pattern.
- * Reduces boilerplate by handling error wrapping and response formatting.
- */
-function registerTool<TInput, TOutput>(
-  server: McpServer,
-  client: GafferApiClient,
-  tool: ToolDefinition<TInput, TOutput>,
-): void {
-  server.registerTool(
-    tool.metadata.name,
-    {
-      title: tool.metadata.title,
-      description: tool.metadata.description,
-      inputSchema: tool.inputSchema,
-      outputSchema: tool.outputSchema,
-    },
-    async (input: TInput) => {
-      try {
-        const output = await tool.execute(client, input)
-        return {
-          content: [{ type: 'text' as const, text: JSON.stringify(output, null, 2) }],
-          structuredContent: output as unknown as Record<string, unknown>,
-        }
-      }
-      catch (error) {
-        return handleToolError(tool.metadata.name, error)
-      }
-    },
-  )
-}
-
-/**
- * Gaffer MCP Server
+ * Gaffer MCP Server — Code Mode
  *
- * Provides AI assistants with access to test history and health metrics.
+ * Instead of individual tools, exposes 3 tools:
+ * - execute_code: Run JavaScript that calls Gaffer API functions
+ * - search_tools: Find available functions by keyword
+ * - list_projects: List projects (user tokens only)
  *
- * Supports two authentication modes:
- * 1. User API Keys (gaf_) - Read-only access to all user's projects
- *    Set via GAFFER_API_KEY environment variable
- * 2. Project Upload Tokens (gfr_) - Legacy, single project access
+ * This follows Cloudflare's "code mode" pattern for MCP servers.
  */
 async function main() {
   // Validate API key is present
@@ -203,197 +89,192 @@ async function main() {
   // Create API client
   const client = GafferApiClient.fromEnv()
 
+  // Build codemode registry
+  const registry = new FunctionRegistry()
+  registerAllTools(registry)
+  const namespace = registry.buildNamespace(client)
+  const declarations = registry.generateAllDeclarations()
+
   // Create MCP server
   const server = new McpServer(
     {
       name: 'gaffer',
-      version: '0.1.0',
+      version: '0.7.0',
     },
     {
-      instructions: `Gaffer provides test analytics and coverage data for your projects.
+      instructions: `Gaffer provides test analytics and coverage data. This server uses **code mode** — instead of individual tools, write JavaScript that calls functions on the \`codemode\` namespace.
 
 ## Authentication
 
 ${client.isUserToken()
-  ? 'You have access to multiple projects. Use `list_projects` to find project IDs, then pass `projectId` to all tools.'
-  : 'Your token is scoped to a single project. Do NOT call `list_projects`. Do NOT pass `projectId` — it resolves automatically. All tools are available.'}
+  ? 'You have a user API key with access to multiple projects. Use `list_projects` to find project IDs, then pass `projectId` to all codemode functions.'
+  : 'Your token is scoped to a single project. Do NOT pass `projectId` — it resolves automatically.'}
 
-## Coverage Analysis Best Practices
+## How to Use
 
-When helping users improve test coverage, combine coverage data with codebase exploration:
+1. Use \`search_tools\` to find relevant functions (or check the execute_code description for all declarations)
+2. Use \`execute_code\` to run JavaScript that calls one or more functions
+3. Results are returned as JSON — you can chain multiple calls in a single execution
 
-1. **Understand code utilization first**: Before targeting files by coverage percentage, explore which code is critical:
-   - Find entry points (route definitions, event handlers, exported functions)
-   - Find heavily-imported files (files imported by many others are high-value targets)
-   - Identify critical business logic (auth, payments, data mutations)
+## Example
 
-2. **Prioritize by impact**: Low coverage alone doesn't indicate priority. Consider:
-   - High utilization + low coverage = highest priority
-   - Large files with 0% coverage have bigger impact than small files
-   - Use find_uncovered_failure_areas for files with both low coverage AND test failures
+\`\`\`javascript
+// Get project health, then check flaky tests if any exist
+const health = await codemode.get_project_health({ projectId: "proj_abc" });
+if (health.flakyTestCount > 0) {
+  const flaky = await codemode.get_flaky_tests({ projectId: "proj_abc" });
+  return { health, flaky };
+}
+return { health };
+\`\`\`
 
-3. **Use path-based queries**: The get_untested_files tool may return many files of a certain type (e.g., UI components). For targeted analysis, use get_coverage_for_file with path prefixes to focus on specific areas of the codebase.
+## Tips
 
-4. **Iterate**: Get baseline → identify targets → write tests → re-check coverage after CI uploads new results.
-
-## Finding Invisible Files
-
-Coverage tools can only report on files that were loaded during test execution. Some files have 0% coverage but don't appear in reports at all - these are "invisible" files that were never imported.
-
-To find invisible files:
-1. Use get_coverage_for_file with a path prefix (e.g., "server/") to see what Gaffer tracks
-2. Use the local Glob tool to list all source files in that path
-3. Compare the lists - files in local but NOT in Gaffer are invisible
-4. These files need tests that actually import them
-
-Example: If get_coverage_for_file("server/api") returns user.ts, auth.ts, but Glob finds user.ts, auth.ts, billing.ts - then billing.ts is invisible and needs tests that import it.
-
-## Agentic CI / Test Failure Diagnosis
-
-When helping diagnose CI failures or fix failing tests:
-
-1. **Check flakiness first**: Use get_flaky_tests to identify non-deterministic tests.
-   Skip flaky tests unless the user specifically wants to stabilize them.
-
-2. **Get failure details**: Use get_test_run_details with status='failed'
-   to see error messages and stack traces for failing tests.
-
-3. **Group by root cause**: Use get_failure_clusters to see which failures
-   share the same underlying error — fix the root cause, not individual tests.
-
-4. **Check history**: Use get_test_history to understand if the failure is new
-   (regression) or recurring (existing bug).
-
-5. **Verify fixes**: After code changes, use compare_test_metrics to confirm
-   the specific test now passes.
-
-6. **Prioritize by risk**: Use find_uncovered_failure_areas to identify
-   which failing code has the lowest test coverage — fix those first.
-
-## Checking Upload Status
-
-When an agent needs to know if CI results are ready:
-
-1. Use get_upload_status with commitSha or branch to find upload sessions
-2. Check processingStatus: "completed" means results are ready, "processing" means wait
-3. Once completed, use the linked testRunIds to get test results`,
+- Use \`return\` to send data back — the return value becomes the tool result
+- Use \`console.log()\` for debug output (captured and returned alongside results)
+- You can make up to 20 API calls per execution
+- All functions are async — use \`await\``,
     },
   )
 
-  // Register all tools using the helper
-  registerTool(server, client, {
-    metadata: getProjectHealthMetadata,
-    inputSchema: getProjectHealthInputSchema,
-    outputSchema: getProjectHealthOutputSchema,
-    execute: executeGetProjectHealth,
-  })
+  // Register execute_code tool
+  server.registerTool(
+    'execute_code',
+    {
+      title: 'Execute Code',
+      description: `Execute JavaScript code that calls Gaffer API functions via the \`codemode\` namespace.
 
-  registerTool(server, client, {
-    metadata: getTestHistoryMetadata,
-    inputSchema: getTestHistoryInputSchema,
-    outputSchema: getTestHistoryOutputSchema,
-    execute: executeGetTestHistory,
-  })
+Write async JavaScript — all functions are available as \`codemode.<function_name>(input)\`.
+Use \`return\` to send results back. Use \`console.log()\` for debug output.
 
-  registerTool(server, client, {
-    metadata: getFlakyTestsMetadata,
-    inputSchema: getFlakyTestsInputSchema,
-    outputSchema: getFlakyTestsOutputSchema,
-    execute: executeGetFlakyTests,
-  })
+## Available Functions
 
-  registerTool(server, client, {
-    metadata: listTestRunsMetadata,
-    inputSchema: listTestRunsInputSchema,
-    outputSchema: listTestRunsOutputSchema,
-    execute: executeListTestRuns,
-  })
+\`\`\`typescript
+${declarations}
+\`\`\`
 
+## Examples
+
+\`\`\`javascript
+// Single call
+const health = await codemode.get_project_health({ projectId: "proj_abc" });
+return health;
+\`\`\`
+
+\`\`\`javascript
+// Multi-step: get flaky tests and check history for each
+const flaky = await codemode.get_flaky_tests({ projectId: "proj_abc", limit: 5 });
+const histories = [];
+for (const test of flaky.flakyTests) {
+  const history = await codemode.get_test_history({ projectId: "proj_abc", testName: test.name, limit: 5 });
+  histories.push({ test: test.name, score: test.flakinessScore, history: history.summary });
+}
+return { flaky: flaky.summary, details: histories };
+\`\`\`
+
+\`\`\`javascript
+// Coverage analysis
+const summary = await codemode.get_coverage_summary({ projectId: "proj_abc" });
+const lowFiles = await codemode.get_coverage_for_file({ projectId: "proj_abc", maxCoverage: 50, limit: 10 });
+return { summary, lowCoverageFiles: lowFiles };
+\`\`\`
+
+## Constraints
+
+- Max 20 API calls per execution
+- 30s timeout
+- No access to Node.js globals (process, require, etc.)`,
+      inputSchema: {
+        code: z.string().describe('JavaScript code to execute. Use `codemode.<function>()` to call API functions. Use `return` for results.'),
+      },
+    },
+    async (input: { code: string }) => {
+      try {
+        const result = await executeCode(input.code, namespace)
+        const output: Record<string, unknown> = {}
+
+        if (result.result !== undefined) {
+          output.result = result.result
+        }
+        if (result.logs.length > 0) {
+          output.logs = result.logs
+        }
+        output.durationMs = result.durationMs
+
+        let text: string
+        try {
+          text = JSON.stringify(output, null, 2)
+        }
+        catch {
+          text = JSON.stringify({
+            error: 'Result could not be serialized to JSON (possible circular reference). Use console.log() to inspect the result, or return a simpler object.',
+            logs: result.logs.length > 0 ? result.logs : undefined,
+            durationMs: result.durationMs,
+          })
+        }
+
+        return {
+          content: [{ type: 'text' as const, text }],
+        }
+      }
+      catch (error) {
+        return handleToolError('execute_code', error)
+      }
+    },
+  )
+
+  // Register search_tools tool
+  server.registerTool(
+    'search_tools',
+    {
+      title: 'Search Tools',
+      description: `Search for available Gaffer API functions by keyword.
+
+Returns matching functions with their TypeScript declarations so you can use them with execute_code.
+
+Examples:
+- "coverage" → coverage-related functions
+- "flaky" → flaky test detection
+- "" (empty) → list all available functions`,
+      inputSchema: searchToolsInputSchema,
+    },
+    async (input: { query?: string }) => {
+      try {
+        const result = executeSearchTools(registry, input)
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
+        }
+      }
+      catch (error) {
+        return handleToolError('search_tools', error)
+      }
+    },
+  )
+
+  // Register list_projects tool (user tokens only)
   if (client.isUserToken()) {
-    registerTool(server, client, {
-      metadata: listProjectsMetadata,
-      inputSchema: listProjectsInputSchema,
-      outputSchema: listProjectsOutputSchema,
-      execute: executeListProjects,
-    })
+    server.registerTool(
+      listProjectsMetadata.name,
+      {
+        title: listProjectsMetadata.title,
+        description: listProjectsMetadata.description,
+        inputSchema: listProjectsInputSchema,
+        outputSchema: listProjectsOutputSchema,
+      },
+      async (input: { organizationId?: string, limit?: number }) => {
+        try {
+          const output = await executeListProjects(client, input)
+          return {
+            content: [{ type: 'text' as const, text: JSON.stringify(output, null, 2) }],
+            structuredContent: output as unknown as Record<string, unknown>,
+          }
+        }
+        catch (error) {
+          return handleToolError(listProjectsMetadata.name, error)
+        }
+      },
+    )
   }
-
-  registerTool(server, client, {
-    metadata: getReportMetadata,
-    inputSchema: getReportInputSchema,
-    outputSchema: getReportOutputSchema,
-    execute: executeGetReport,
-  })
-
-  registerTool(server, client, {
-    metadata: getSlowestTestsMetadata,
-    inputSchema: getSlowestTestsInputSchema,
-    outputSchema: getSlowestTestsOutputSchema,
-    execute: executeGetSlowestTests,
-  })
-
-  registerTool(server, client, {
-    metadata: getTestRunDetailsMetadata,
-    inputSchema: getTestRunDetailsInputSchema,
-    outputSchema: getTestRunDetailsOutputSchema,
-    execute: executeGetTestRunDetails,
-  })
-
-  registerTool(server, client, {
-    metadata: getFailureClustersMetadata,
-    inputSchema: getFailureClustersInputSchema,
-    outputSchema: getFailureClustersOutputSchema,
-    execute: executeGetFailureClusters,
-  })
-
-  registerTool(server, client, {
-    metadata: compareTestMetricsMetadata,
-    inputSchema: compareTestMetricsInputSchema,
-    outputSchema: compareTestMetricsOutputSchema,
-    execute: executeCompareTestMetrics,
-  })
-
-  registerTool(server, client, {
-    metadata: getCoverageSummaryMetadata,
-    inputSchema: getCoverageSummaryInputSchema,
-    outputSchema: getCoverageSummaryOutputSchema,
-    execute: executeGetCoverageSummary,
-  })
-
-  registerTool(server, client, {
-    metadata: getCoverageForFileMetadata,
-    inputSchema: getCoverageForFileInputSchema,
-    outputSchema: getCoverageForFileOutputSchema,
-    execute: executeGetCoverageForFile,
-  })
-
-  registerTool(server, client, {
-    metadata: findUncoveredFailureAreasMetadata,
-    inputSchema: findUncoveredFailureAreasInputSchema,
-    outputSchema: findUncoveredFailureAreasOutputSchema,
-    execute: executeFindUncoveredFailureAreas,
-  })
-
-  registerTool(server, client, {
-    metadata: getUntestedFilesMetadata,
-    inputSchema: getUntestedFilesInputSchema,
-    outputSchema: getUntestedFilesOutputSchema,
-    execute: executeGetUntestedFiles,
-  })
-
-  registerTool(server, client, {
-    metadata: getReportBrowserUrlMetadata,
-    inputSchema: getReportBrowserUrlInputSchema,
-    outputSchema: getReportBrowserUrlOutputSchema,
-    execute: executeGetReportBrowserUrl,
-  })
-
-  registerTool(server, client, {
-    metadata: getUploadStatusMetadata,
-    inputSchema: getUploadStatusInputSchema,
-    outputSchema: getUploadStatusOutputSchema,
-    execute: executeGetUploadStatus,
-  })
 
   // Connect via stdio transport
   const transport = new StdioServerTransport()

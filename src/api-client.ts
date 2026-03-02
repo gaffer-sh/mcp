@@ -11,6 +11,7 @@ import type {
   GafferConfig,
   ProjectsResponse,
   ReportResponse,
+  SearchFailuresResponse,
   SlowestTestsResponse,
   TestHistoryResponse,
   TestRunDetailsResponse,
@@ -29,7 +30,7 @@ const REQUEST_TIMEOUT_MS = 30000
 // Retry configuration
 const MAX_RETRIES = 3
 const INITIAL_RETRY_DELAY_MS = 1000
-const RETRYABLE_STATUS_CODES = [401, 429, 500, 502, 503, 504]
+const RETRYABLE_STATUS_CODES = [429, 500, 502, 503, 504]
 
 /**
  * Sleep for a given number of milliseconds
@@ -52,7 +53,13 @@ export function detectTokenType(token: string): TokenType {
   if (token.startsWith('gaf_')) {
     return 'user'
   }
-  return 'project'
+  if (token.startsWith('gfr_')) {
+    return 'project'
+  }
+  throw new Error(
+    `Unrecognized API key format. Expected a user API key (gaf_...) or project token (gfr_...). `
+    + `Got: "${token.substring(0, 4)}...". Check your GAFFER_API_KEY environment variable.`,
+  )
 }
 
 /**
@@ -69,7 +76,7 @@ export class GafferApiClient {
   private apiKey: string
   private baseUrl: string
   public readonly tokenType: TokenType
-  private resolvedProjectId: string | null = null
+  private resolveProjectIdPromise: Promise<string> | null = null
 
   constructor(config: GafferConfig) {
     this.apiKey = config.apiKey
@@ -103,7 +110,8 @@ export class GafferApiClient {
 
   /**
    * Resolve the project ID for the current token.
-   * For project tokens, fetches from /project on first call and caches.
+   * For project tokens, fetches from /project on first call and caches the Promise
+   * to deduplicate concurrent calls.
    * For user tokens, requires explicit projectId.
    */
   async resolveProjectId(projectId?: string): Promise<string> {
@@ -115,14 +123,26 @@ export class GafferApiClient {
       throw new Error('projectId is required when using a user API Key')
     }
 
-    // Project token: resolve from /project endpoint (cached)
-    if (this.resolvedProjectId) {
-      return this.resolvedProjectId
+    // Project token: resolve from /project endpoint (cached Promise deduplicates concurrent calls)
+    if (!this.resolveProjectIdPromise) {
+      this.resolveProjectIdPromise = this.request<{ project: { id: string } }>('/project')
+        .then((response) => {
+          if (!response?.project?.id) {
+            throw new Error(
+              'Failed to resolve project ID from token: unexpected response from /project endpoint. '
+              + 'Ensure your project token (gfr_) is valid and the project still exists.',
+            )
+          }
+          return response.project.id
+        })
+        .catch((error) => {
+          // Clear cache on failure so next call retries
+          this.resolveProjectIdPromise = null
+          throw error
+        })
     }
 
-    const response = await this.request<{ project: { id: string } }>('/project')
-    this.resolvedProjectId = response.project.id
-    return this.resolvedProjectId
+    return this.resolveProjectIdPromise
   }
 
   /**
@@ -308,7 +328,9 @@ export class GafferApiClient {
   }
 
   /**
-   * Get report files for a test run
+   * Get report files for a test run.
+   * User-only: the /user/test-runs/:id/report route has no project-scoped equivalent,
+   * so project tokens cannot access raw report downloads.
    */
   async getReport(testRunId: string): Promise<ReportResponse> {
     if (!this.isUserToken()) {
@@ -530,6 +552,34 @@ export class GafferApiClient {
     const projectId = await this.resolveProjectId(options.projectId)
     return this.request<UploadSessionDetailResponse>(
       `/user/projects/${projectId}/upload-sessions/${options.sessionId}`,
+    )
+  }
+
+  /**
+   * Search across test failures by error message, stack trace, or test name
+   */
+  async searchFailures(options: {
+    projectId?: string
+    query: string
+    searchIn?: 'errors' | 'names' | 'all'
+    days?: number
+    branch?: string
+    limit?: number
+  }): Promise<SearchFailuresResponse> {
+    if (!options.query) {
+      throw new Error('query is required')
+    }
+
+    const projectId = await this.resolveProjectId(options.projectId)
+    return this.request<SearchFailuresResponse>(
+      `/user/projects/${projectId}/search-failures`,
+      {
+        query: options.query,
+        ...(options.searchIn && { searchIn: options.searchIn }),
+        ...(options.days && { days: options.days }),
+        ...(options.branch && { branch: options.branch }),
+        ...(options.limit && { limit: options.limit }),
+      },
     )
   }
 }

@@ -112,7 +112,7 @@ Returns files sorted by coverage percentage (lowest first), filtered
 to only include files below a coverage threshold.
 
 Parameters:
-- projectId: The project to analyze (required)
+- projectId (optional): Project ID — required for user API keys, auto-resolved for project tokens
 - maxCoverage: Include files with coverage at or below this % (default: 10)
 - limit: Maximum number of files to return (default: 20, max: 100)
 

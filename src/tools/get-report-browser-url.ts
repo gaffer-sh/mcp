@@ -77,7 +77,7 @@ Returns a signed URL that can be opened directly in a browser without requiring
 the user to log in. The URL expires after 30 minutes for security.
 
 Parameters:
-- projectId: The project the test run belongs to (required)
+- projectId (optional): Project ID — required for user API keys, auto-resolved for project tokens
 - testRunId: The test run to view (required)
 - filename: Specific file to open (optional, defaults to index.html)
 

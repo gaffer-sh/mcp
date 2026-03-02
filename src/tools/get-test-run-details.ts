@@ -137,7 +137,7 @@ export const getTestRunDetailsMetadata = {
 
 Parameters:
 - testRunId (required): The test run ID to get details for
-- projectId (required): Project ID the test run belongs to
+- projectId (optional): Project ID — required for user API keys, auto-resolved for project tokens
 - status (optional): Filter by test status: "passed", "failed", or "skipped"
 - limit (optional): Max tests to return (default: 100, max: 500)
 - offset (optional): Pagination offset (default: 0)

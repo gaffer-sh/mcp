@@ -93,7 +93,7 @@ areas in your codebase that need attention. Files are ranked by a "risk score"
 calculated as: (100 - coverage%) × failureCount.
 
 Parameters:
-- projectId: The project to analyze (required)
+- projectId (optional): Project ID — required for user API keys, auto-resolved for project tokens
 - days: Analysis period for test failures (default: 30)
 - coverageThreshold: Include files below this coverage % (default: 80)
 

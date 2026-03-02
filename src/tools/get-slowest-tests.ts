@@ -107,7 +107,7 @@ export const getSlowestTestsMetadata = {
   description: `Get the slowest tests in a project, sorted by P95 duration.
 
 Parameters:
-- projectId (required): Project ID to analyze
+- projectId (optional): Project ID — required for user API keys, auto-resolved for project tokens
 - days (optional): Analysis period in days (default: 30, max: 365)
 - limit (optional): Max tests to return (default: 20, max: 100)
 - framework (optional): Filter by framework (e.g., "playwright", "vitest")

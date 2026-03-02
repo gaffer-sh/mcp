@@ -122,7 +122,7 @@ export const compareTestMetricsMetadata = {
 Useful for measuring the impact of code changes on test performance or reliability.
 
 Parameters:
-- projectId (required): Project ID
+- projectId (optional): Project ID — required for user API keys, auto-resolved for project tokens
 - testName (required): The test name to compare (short name or full name)
 - Option 1 - Compare by commit:
   - beforeCommit: Commit SHA for "before" measurement

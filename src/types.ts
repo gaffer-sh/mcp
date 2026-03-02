@@ -399,3 +399,25 @@ export interface UploadSessionDetailResponse {
   testRuns: LinkedTestRunSummary[]
   coverageReports: LinkedCoverageReportSummary[]
 }
+
+/**
+ * Search failure match entry
+ */
+export interface SearchFailureMatch {
+  testName: string
+  testRunId: string
+  branch: string | null
+  commitSha: string | null
+  errorMessage: string | null
+  errorStack: string | null
+  createdAt: string
+}
+
+/**
+ * Search failures response
+ */
+export interface SearchFailuresResponse {
+  matches: SearchFailureMatch[]
+  total: number
+  query: string
+}

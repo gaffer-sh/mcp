@@ -110,7 +110,7 @@ export const getUploadStatusMetadata = {
 Use this tool to answer "are my test results ready?" after pushing code.
 
 Parameters:
-- projectId (required): The project ID
+- projectId (optional): Project ID — required for user API keys, auto-resolved for project tokens
 - sessionId (optional): Specific upload session ID for detailed status
 - commitSha (optional): Filter by commit SHA to find uploads for a specific commit
 - branch (optional): Filter by branch name
