@@ -560,21 +560,17 @@ export class GafferApiClient {
    */
   async searchFailures(options: {
     projectId?: string
-    query: string
+    query?: string
     searchIn?: 'errors' | 'names' | 'all'
     days?: number
     branch?: string
     limit?: number
   }): Promise<SearchFailuresResponse> {
-    if (!options.query) {
-      throw new Error('query is required')
-    }
-
     const projectId = await this.resolveProjectId(options.projectId)
     return this.request<SearchFailuresResponse>(
       `/user/projects/${projectId}/search-failures`,
       {
-        query: options.query,
+        ...(options.query && { query: options.query }),
         ...(options.searchIn && { searchIn: options.searchIn }),
         ...(options.days && { days: options.days }),
         ...(options.branch && { branch: options.branch }),

@@ -99,7 +99,7 @@ async function main() {
   const server = new McpServer(
     {
       name: 'gaffer',
-      version: '0.7.0',
+      version: '0.8.0',
     },
     {
       instructions: `Gaffer provides test analytics and coverage data. This server uses **code mode** — instead of individual tools, write JavaScript that calls functions on the \`codemode\` namespace.
