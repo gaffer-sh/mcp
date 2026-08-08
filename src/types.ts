@@ -419,5 +419,8 @@ export interface SearchFailureMatch {
 export interface SearchFailuresResponse {
   matches: SearchFailureMatch[]
   total: number
-  query: string
+  /** True when the scan caps cut the list short of the full window. */
+  truncated: boolean
+  /** The query that was searched for, or null when every failure was returned. */
+  query: string | null
 }

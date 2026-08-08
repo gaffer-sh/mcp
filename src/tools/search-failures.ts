@@ -12,7 +12,8 @@ export const searchFailuresInputSchema = {
   query: z
     .string()
     .min(1)
-    .describe('Search query to match against failure messages, error stacks, or test names.'),
+    .optional()
+    .describe('Search query to match against failure messages, error stacks, or test names. Omit to return every failure in the window.'),
   searchIn: z
     .enum(['errors', 'names', 'all'])
     .optional()
@@ -51,12 +52,13 @@ export const searchFailuresOutputSchema = {
     createdAt: z.string(),
   })),
   total: z.number(),
-  query: z.string(),
+  truncated: z.boolean(),
+  query: z.string().nullable(),
 }
 
 export interface SearchFailuresInput {
   projectId?: string
-  query: string
+  query?: string
   searchIn?: 'errors' | 'names' | 'all'
   days?: number
   branch?: string
@@ -74,7 +76,8 @@ export interface SearchFailuresOutput {
     createdAt: string
   }>
   total: number
-  query: string
+  truncated: boolean
+  query: string | null
 }
 
 /**
@@ -93,7 +96,7 @@ export async function executeSearchFailures(
 export const searchFailuresMetadata = {
   name: 'search_failures',
   title: 'Search Failures',
-  description: `Search across test failures by error message, stack trace, or test name.
+  description: `Search across test failures by error message, stack trace, or test name, or list them all.
 
 Use this to find specific failures across test runs — like grep for your test history.
 
@@ -101,6 +104,8 @@ Examples:
 - "TypeError: Cannot read properties of undefined" → find all occurrences of this error
 - "timeout" → find timeout-related failures
 - "auth" with searchIn="names" → find failing auth tests
+- no query, days=7 → everything that failed in the last week
 
-Returns matching failures with test run context (branch, commit, timestamp) for investigation.`,
+Returns matching failures with test run context (branch, commit, timestamp) for investigation.
+\`truncated\` is true when the scan caps cut the list short — narrow by branch or shorten \`days\`.`,
 }

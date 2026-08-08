@@ -4,7 +4,7 @@ MCP (Model Context Protocol) server for [Gaffer](https://gaffer.sh) - give your 
 
 ## What is this?
 
-This MCP server connects AI coding assistants like Claude Code and Cursor to your Gaffer test history and coverage data. It allows AI to:
+This MCP server connects AI coding assistants like Claude Code and Cursor to your Gaffer test history and coverage data. It runs in code mode: three MCP tools over a namespace of 16 analytics functions. It allows AI to:
 
 - Check your project's test health (pass rate, flaky tests, trends)
 - Look up the history of specific tests to understand stability
@@ -64,45 +64,47 @@ Add to `.cursor/mcp.json` in your project:
 }
 ```
 
-## Available Tools
+## How this server works
 
-### Project & Test Run Tools
+This server uses **code mode**. Instead of exposing one MCP tool per API call, it exposes three tools plus a `codemode` namespace you call from JavaScript. Fewer tool definitions occupy the context window, and a single execution can chain several calls.
 
-| Tool | Description |
+| MCP tool | What it does |
 |------|-------------|
-| `list_projects` | List all projects you have access to |
-| `get_project_health` | Get health metrics (pass rate, flaky count, trends) |
-| `list_test_runs` | List recent test runs with optional filtering |
-| `get_test_run_details` | Get parsed test results for a specific test run |
-| `get_report` | Get report file URLs for a test run |
-| `get_report_browser_url` | Get a browser-navigable URL for viewing reports |
+| `execute_code` | Run JavaScript against `codemode.<function>()`. Max 20 API calls, 30s timeout. |
+| `search_tools` | Find available functions by keyword. An empty query lists all of them. |
+| `list_projects` | List projects. Registered only when the token is a user API Key (`gaf_`). |
 
-### Test Analysis Tools
+```javascript
+const health = await codemode.get_project_health({ projectId: "proj_abc" });
+if (health.flakyTestCount > 0) {
+  const flaky = await codemode.get_flaky_tests({ projectId: "proj_abc" });
+  return { health, flaky };
+}
+return { health };
+```
 
-| Tool | Description |
-|------|-------------|
-| `get_test_history` | Get pass/fail history for a specific test |
-| `get_flaky_tests` | Get tests with high flip rates (pass↔fail) |
-| `get_slowest_tests` | Get slowest tests by P95 duration |
-| `compare_test_metrics` | Compare test performance between commits |
-| `get_failure_clusters` | Group failed tests by root cause (error similarity) |
+## Functions available via `execute_code`
 
-### Upload & Status Tools
+| Function | Category | Description |
+|------|------|-------------|
+| `get_project_health` | health | Health score, pass rate, flaky count, trend |
+| `get_test_history` | testing | Pass/fail history for a specific test |
+| `get_flaky_tests` | testing | Tests with high flip rates (pass↔fail) |
+| `list_test_runs` | testing | Recent test runs, filterable by commit/branch/status |
+| `get_test_run_details` | testing | Parsed individual results for one run |
+| `get_failure_clusters` | testing | Failed tests grouped by root cause |
+| `get_slowest_tests` | testing | Slowest tests by P95 duration |
+| `compare_test_metrics` | testing | Compare test performance between commits or runs |
+| `search_failures` | testing | Search failures by error or test-name pattern, or list all recent failures |
+| `get_coverage_summary` | coverage | Overall coverage metrics and trend |
+| `get_coverage_for_file` | coverage | Coverage for specific files or paths |
+| `get_untested_files` | coverage | Files below a coverage threshold |
+| `find_uncovered_failure_areas` | coverage | Files with low coverage AND test failures |
+| `get_report` | reports | Report file URLs for a test run |
+| `get_report_browser_url` | reports | Signed browser-navigable report URL (30 min) |
+| `get_upload_status` | uploads | Whether CI results are uploaded and processed |
 
-| Tool | Description |
-|------|-------------|
-| `get_upload_status` | Check if CI results are uploaded and processed |
-
-### Coverage Tools
-
-| Tool | Description |
-|------|-------------|
-| `get_coverage_summary` | Get overall coverage metrics and trends |
-| `get_coverage_for_file` | Get coverage for specific files or paths |
-| `get_untested_files` | Get files below a coverage threshold |
-| `find_uncovered_failure_areas` | Find files with low coverage AND test failures |
-
-## Tool Details
+## Function Reference
 
 ### `list_projects`
 
@@ -224,6 +226,14 @@ Group failed tests by root cause using error message similarity.
 - **Returns:** Clusters of failed tests grouped by similar error messages, with representative error and test count
 - **Example:** "Are these 15 failures from the same bug?"
 
+### `search_failures`
+
+Search past failures by error message, stack trace, or test name — or list every failure in the window.
+
+- **Input:** `query` (optional — omit to return all failures), `projectId` (required for `gaf_` keys), `searchIn` (optional: `errors`/`names`/`all`, default `all`), `days` (optional, default: 30), `branch` (optional), `limit` (optional, default: 20)
+- **Returns:** Matching failures with test name, error message, run and commit context, plus `truncated` when scan caps cut the list short
+- **Example:** "Have we seen this connection-refused error before?" / "What failed in the last 7 days?"
+
 ### `get_upload_status`
 
 Check if CI results have been uploaded and processed.
@@ -234,7 +244,7 @@ Check if CI results have been uploaded and processed.
 
 ## Agentic CI Workflows
 
-These workflows show how an AI agent can use Gaffer tools to diagnose CI failures, wait for results, and find coverage gaps.
+These workflows show how an AI agent diagnoses CI failures, waits for results, and finds coverage gaps. Each step is a `codemode` function, so a whole chain runs inside one `execute_code` call rather than one round-trip per step.
 
 ### Workflow: Diagnose CI Failures
 
@@ -276,12 +286,13 @@ find_uncovered_failure_areas(projectId)
 2. Find files with no coverage at all
 3. Drill into specific directories for targeted analysis
 
-### Tool Quick Reference
+### Function Quick Reference
 
-| Agent Question | Tool |
+| Agent Question | Function |
 |---|---|
 | "What failed?" | `get_test_run_details` |
 | "Same root cause?" | `get_failure_clusters` |
+| "Seen this error before?" | `search_failures` |
 | "Is it flaky?" | `get_flaky_tests` |
 | "Is this new?" | `get_test_history` |
 | "Did my fix work?" | `compare_test_metrics` |
@@ -334,9 +345,9 @@ get_coverage_for_file(filePath="lib/core")
 
 User API Keys (`gaf_` prefix) provide read-only access to all projects across your organizations. Get your API Key from: **Account Settings > API Keys**
 
-### Project Upload Tokens (Legacy)
+### Project Tokens
 
-Project Upload Tokens (`gfr_` prefix) are designed for uploading test results and only provide access to a single project. User API Keys are preferred for the MCP server.
+Project Tokens (`gfr_` prefix) are designed for uploading test results and only provide access to a single project. When you use one, omit `projectId` — it resolves automatically. User API Keys are preferred for the MCP server because they enable `list_projects` and read across projects.
 
 ## Environment Variables
 
