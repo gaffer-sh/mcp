@@ -1,0 +1,66 @@
+# ============================================================================
+# THROWAWAY — DELETE ME once MCP registry publishing is confirmed working.
+#
+# Exercises only the auth handshake from release.yml. It never publishes to
+# npm or to the MCP registry, so it is safe to run repeatedly.
+#
+# Run it by pushing a throwaway tag (works from any branch):
+#   git tag mcp-authtest-1 && git push origin mcp-authtest-1
+# Clean up after:
+#   git tag -d mcp-authtest-1 && git push origin :refs/tags/mcp-authtest-1
+#
+# `mcp-authtest*` deliberately does not match release.yml's `mcp-v*`, so
+# pushing a test tag cannot trigger a real release.
+# ============================================================================
+name: Test MCP Registry Auth (throwaway)
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'mcp-authtest*'
+
+jobs:
+  test-auth:
+    name: Verify DNS auth against the MCP Registry
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Confirm MCP_PRIVATE_KEY secret is present and well-formed
+        run: |
+          if [ -z "$MCP_PRIVATE_KEY" ]; then
+            echo "::error::MCP_PRIVATE_KEY secret is not set on this repository."
+            exit 1
+          fi
+          # An Ed25519 private key is 32 bytes == 64 hex chars. A mangled paste
+          # (wrapped, truncated, or with stray whitespace) shows up here rather
+          # than as an opaque signature failure below.
+          if ! printf '%s' "$MCP_PRIVATE_KEY" | grep -qE '^[0-9a-fA-F]{64}$'; then
+            echo "::error::MCP_PRIVATE_KEY is not 64 hex characters (got ${#MCP_PRIVATE_KEY} chars). Re-copy the key."
+            exit 1
+          fi
+          echo "Secret is present and is 64 hex characters."
+        env:
+          MCP_PRIVATE_KEY: ${{ secrets.MCP_PRIVATE_KEY }}
+
+      - name: Show the published proof record
+        run: dig +short TXT gaffer.sh | tr ' ' '\n' | grep -i MCPv1 -A2 || dig +short TXT gaffer.sh
+
+      - name: Install mcp-publisher
+        run: |
+          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+
+      - name: Authenticate to MCP Registry
+        run: ./mcp-publisher login dns --domain gaffer.sh --private-key "$MCP_PRIVATE_KEY"
+        env:
+          MCP_PRIVATE_KEY: ${{ secrets.MCP_PRIVATE_KEY }}
+
+      - name: Validate server.json
+        run: ./mcp-publisher validate server.json
+
+      - name: Done
+        run: echo "Auth succeeded. release.yml should be able to publish."

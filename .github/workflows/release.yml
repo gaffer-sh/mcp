@@ -38,3 +38,28 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
+
+      ### Publish MCP server:
+
+      - name: Install mcp-publisher
+        run: |
+          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+
+      # `sh.gaffer/mcp` is a domain namespace, so the registry requires proof of
+      # control over gaffer.sh. GitHub OIDC only ever grants `io.github.*`.
+      # Proof record lives on the gaffer.sh apex: v=MCPv1; k=ed25519; p=<pubkey>
+      - name: Authenticate to MCP Registry
+        run: ./mcp-publisher login dns --domain gaffer.sh --private-key "$MCP_PRIVATE_KEY"
+        env:
+          MCP_PRIVATE_KEY: ${{ secrets.MCP_PRIVATE_KEY }}
+
+      # package.json is the source of truth (bumpp bumps it); the tag name is
+      # `mcp-v*`, not `v*`, so parsing GITHUB_REF here would be wrong.
+      - name: Sync version into server.json
+        run: |
+          VERSION=$(jq -r .version package.json)
+          jq --arg v "$VERSION" '.version = $v | .packages[].version = $v' server.json > server.tmp
+          mv server.tmp server.json
+
+      - name: Publish server to MCP Registry
+        run: ./mcp-publisher publish
