@@ -97,6 +97,12 @@ import {
   searchFailuresMetadata,
 } from '../tools/search-failures.js'
 
+import {
+  executeUploadTestResults,
+  uploadTestResultsInputSchema,
+  uploadTestResultsMetadata,
+} from '../tools/upload-test-results.js'
+
 type ToolRegistration = Omit<FunctionEntry, 'name' | 'description'> & {
   metadata: { name: string, description: string }
 }
@@ -213,6 +219,13 @@ const TOOLS: ToolRegistration[] = [
     execute: executeSearchFailures,
     category: 'testing',
     keywords: ['search', 'failure', 'error message', 'grep', 'find'],
+  },
+  {
+    metadata: uploadTestResultsMetadata,
+    inputSchema: uploadTestResultsInputSchema,
+    execute: executeUploadTestResults,
+    category: 'uploads',
+    keywords: ['upload', 'ingest', 'submit', 'publish', 'results', 'write'],
   },
 ]
 

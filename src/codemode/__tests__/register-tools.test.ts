@@ -8,7 +8,7 @@ describe('registerAllTools', () => {
     registerAllTools(registry)
 
     const all = registry.getAll()
-    expect(all).toHaveLength(16)
+    expect(all).toHaveLength(17)
   })
 
   it('registers key tool names', () => {
@@ -21,6 +21,7 @@ describe('registerAllTools', () => {
     expect(names).toContain('get_coverage_summary')
     expect(names).toContain('list_test_runs')
     expect(names).toContain('search_failures')
+    expect(names).toContain('upload_test_results')
   })
 
   it('every entry has non-empty metadata', () => {

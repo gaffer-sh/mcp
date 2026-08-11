@@ -9,6 +9,8 @@ import type {
   FailureClustersResponse,
   FlakyTestsResponse,
   GafferConfig,
+  IngestPayload,
+  IngestResponse,
   ProjectsResponse,
   ReportResponse,
   SearchFailuresResponse,
@@ -151,6 +153,7 @@ export class GafferApiClient {
   private async request<T>(
     endpoint: string,
     params?: Record<string, string | number>,
+    options?: { method?: 'GET' | 'POST', body?: unknown, retry?: boolean },
   ): Promise<T> {
     const url = new URL(`/api/v1${endpoint}`, this.baseUrl)
 
@@ -162,21 +165,31 @@ export class GafferApiClient {
       }
     }
 
+    const method = options?.method ?? 'GET'
+    const serializedBody = options?.body === undefined ? undefined : JSON.stringify(options.body)
+
+    // Reads retry freely. Writes must opt in, and today none do — see postJson.
+    const maxRetries = (options?.retry ?? method === 'GET') ? MAX_RETRIES : 0
+
     let lastError: Error | null = null
 
-    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
       // Set up request timeout
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
 
       try {
         const response = await fetch(url.toString(), {
-          method: 'GET',
+          method,
           headers: {
             'X-API-Key': this.apiKey,
             'Accept': 'application/json',
             'User-Agent': `gaffer-mcp/${pkg.version}`,
+            // Tags the write in Gaffer's audit log. Descriptive only.
+            'X-Gaffer-Source': 'mcp',
+            ...(serializedBody !== undefined && { 'Content-Type': 'application/json' }),
           },
+          ...(serializedBody !== undefined && { body: serializedBody }),
           signal: controller.signal,
         })
 
@@ -184,7 +197,7 @@ export class GafferApiClient {
           const errorData = await response.json().catch(() => ({})) as ApiErrorResponse
 
           // Check if we should retry this status code
-          if (RETRYABLE_STATUS_CODES.includes(response.status) && attempt < MAX_RETRIES) {
+          if (RETRYABLE_STATUS_CODES.includes(response.status) && attempt < maxRetries) {
             // For 429 (rate limit), use Retry-After header if available
             let delayMs = INITIAL_RETRY_DELAY_MS * (2 ** attempt)
             if (response.status === 429) {
@@ -209,7 +222,7 @@ export class GafferApiClient {
 
         if (error instanceof Error && error.name === 'AbortError') {
           lastError = new Error(`Request timed out after ${REQUEST_TIMEOUT_MS}ms`)
-          if (attempt < MAX_RETRIES) {
+          if (attempt < maxRetries) {
             await sleep(INITIAL_RETRY_DELAY_MS * (2 ** attempt))
             continue
           }
@@ -217,7 +230,7 @@ export class GafferApiClient {
         }
 
         // For network errors, retry
-        if (error instanceof TypeError && attempt < MAX_RETRIES) {
+        if (error instanceof TypeError && attempt < maxRetries) {
           lastError = error
           await sleep(INITIAL_RETRY_DELAY_MS * (2 ** attempt))
           continue
@@ -232,6 +245,44 @@ export class GafferApiClient {
 
     // Should not reach here, but just in case
     throw lastError || new Error('Request failed after retries')
+  }
+
+  /**
+   * POST a JSON body to the Gaffer API.
+   *
+   * Deliberately does not retry. Gaffer's write endpoints are not idempotent —
+   * `POST /api/v1/ingest` mints a fresh upload per request, so a retried upload
+   * lands under a new upload id and becomes a second test run rather than being
+   * deduplicated. Duplicate runs would quietly skew flaky detection and health
+   * scores, which is worse than surfacing a transient failure to the caller.
+   *
+   * If a write endpoint ever gains a real idempotency key, pass `retry: true`
+   * for that call specifically rather than changing this default.
+   */
+  private async postJson<T>(
+    endpoint: string,
+    body: unknown,
+    params?: Record<string, string | number>,
+  ): Promise<T> {
+    return this.request<T>(endpoint, params, { method: 'POST', body })
+  }
+
+  /**
+   * Upload structured test results.
+   *
+   * Works with either token type: project tokens are already scoped to a
+   * project, while user API keys must name one.
+   */
+  async uploadTestResults(
+    payload: IngestPayload,
+    projectId?: string,
+  ): Promise<IngestResponse> {
+    // Project tokens ignore the query param; user keys require it.
+    const params = this.isUserToken()
+      ? { projectId: await this.resolveProjectId(projectId) }
+      : undefined
+
+    return this.postJson<IngestResponse>('/ingest', payload, params)
   }
 
   /**

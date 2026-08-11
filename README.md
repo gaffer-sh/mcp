@@ -4,7 +4,7 @@ MCP (Model Context Protocol) server for [Gaffer](https://gaffer.sh) - give your 
 
 ## What is this?
 
-This MCP server connects AI coding assistants like Claude Code and Cursor to your Gaffer test history and coverage data. It runs in code mode: three MCP tools over a namespace of 16 analytics functions. It allows AI to:
+This MCP server connects AI coding assistants like Claude Code and Cursor to your Gaffer test history and coverage data. It runs in code mode: three MCP tools over a namespace of 17 functions — 16 read-only analytics functions plus `upload_test_results`. It allows AI to:
 
 - Check your project's test health (pass rate, flaky tests, trends)
 - Look up the history of specific tests to understand stability
@@ -103,6 +103,9 @@ return { health };
 | `get_report` | reports | Report file URLs for a test run |
 | `get_report_browser_url` | reports | Signed browser-navigable report URL (30 min) |
 | `get_upload_status` | uploads | Whether CI results are uploaded and processed |
+| `upload_test_results` | uploads | Upload test results (**write**) — rate-limited and audit-logged |
+
+Every function except `upload_test_results` is read-only.
 
 ## Function Reference
 
@@ -241,6 +244,30 @@ Check if CI results have been uploaded and processed.
 - **Input:** `projectId` (required), `sessionId` (optional), `commitSha` (optional), `branch` (optional)
 - **Returns:** Upload session(s) with processing status, linked test runs and coverage reports
 - **Example:** "Are my test results ready for commit abc123?"
+
+### `upload_test_results`
+
+Upload structured test results. This is the only function that writes.
+
+Use it when you have results in hand — parsed from CI output or a runner's JSON
+report — and no Gaffer CLI is available to upload them.
+
+- **Input:** `projectId` (required for `gaf_` keys), `framework` (required), `tests` (required), `branch`, `commitSha`, `ciProvider`, `startedAt`, `finishedAt`, `coverage`
+- **Returns:** `uploadSessionId`, the generated `runId`, and the derived pass/fail/skip summary
+- **Example:** "Upload these 42 parsed pytest results so we can track them"
+
+`runId`, the run timestamps and the summary are derived from `tests` — pass
+`startedAt`/`finishedAt` only if you know the real wall-clock window.
+
+Two constraints worth knowing:
+
+- **Not idempotent.** Each call creates a new run, so a retry after an uncertain
+  failure produces a duplicate. Check `get_upload_status` instead of retrying.
+- **Rate-limited per project**, and every call is written to the project's audit
+  log with the id of the credential that made it.
+
+Processing is asynchronous: results take a few seconds to become visible to the
+read functions.
 
 ## Agentic CI Workflows
 

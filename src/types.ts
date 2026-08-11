@@ -424,3 +424,74 @@ export interface SearchFailuresResponse {
   /** The query that was searched for, or null when every failure was returned. */
   query: string | null
 }
+
+/**
+ * Structured test result accepted by POST /api/v1/ingest.
+ */
+export interface IngestTestResult {
+  name: string
+  status: 'passed' | 'failed' | 'skipped' | 'todo'
+  durationMs: number
+  filePath?: string
+  error?: string
+  retryCount?: number
+  flaky?: boolean
+  /** ISO 8601 wall-clock start of this test */
+  startedAt?: string
+}
+
+export interface IngestCoverageMetrics {
+  covered: number
+  total: number
+}
+
+export interface IngestFileCoverage {
+  path: string
+  lines: IngestCoverageMetrics
+  branches: IngestCoverageMetrics
+  functions: IngestCoverageMetrics
+}
+
+export interface IngestCoverage {
+  format: string
+  lines: IngestCoverageMetrics
+  branches: IngestCoverageMetrics
+  functions: IngestCoverageMetrics
+  files: IngestFileCoverage[]
+}
+
+/**
+ * Request body for POST /api/v1/ingest.
+ *
+ * Mirrors the dashboard's ingest schema. The MCP tool derives runId, the
+ * timestamps and the summary rather than asking the caller for them.
+ */
+export interface IngestPayload {
+  /** Client-generated UUID, stored as the report's source key */
+  runId: string
+  framework: string
+  branch?: string
+  commitSha?: string
+  ciProvider?: string
+  /** ISO 8601 */
+  startedAt: string
+  /** ISO 8601 */
+  finishedAt: string
+  summary: {
+    total: number
+    passed: number
+    failed: number
+    skipped: number
+    durationMs: number
+  }
+  tests: IngestTestResult[]
+  coverage?: IngestCoverage
+}
+
+/**
+ * Response from POST /api/v1/ingest. The upload is processed asynchronously,
+ * so this returns immediately with a session id rather than a finished run.
+ */
+export interface IngestResponse {
+  uploadSessionId: string
+}

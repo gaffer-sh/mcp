@@ -4,7 +4,21 @@ import type { ExecutionResult } from './types.js'
  * Patterns blocked from user code as a basic guard.
  * This is NOT a sandbox — determined users can bypass these checks via
  * string concatenation, bracket notation, or constructor access.
- * The real security boundary is the API layer (read-only, user's own token).
+ *
+ * The real security boundary is the API layer, and it is the caller's own
+ * credential: escaping these checks cannot reach anything the configured token
+ * could not already reach. That argument used to rest on the namespace being
+ * read-only. It no longer is — `upload_test_results` writes — so the boundary is
+ * now stated in terms of the credential rather than the verb:
+ *
+ * - A project token (`gfr_`) can only write to its one project.
+ * - A user API key (`gaf_`) can write to every project that user can reach, which
+ *   is why the audit log records the credential id and not just its type.
+ * - Writes are rate-limited per project server-side, and MAX_API_CALLS below caps
+ *   how many any single execution can issue.
+ *
+ * The exposure a sandbox escape adds is therefore bounded by what the operator
+ * already handed the server, not by what this list catches.
  */
 const BLOCKED_PATTERNS = [
   'globalThis',
@@ -52,7 +66,9 @@ export function validateCode(code: string): string | null {
  * - Blocked patterns prevent obvious escape hatches
  * - API call counting prevents resource exhaustion
  * - Timeout prevents infinite loops
- * - The real security boundary is the API itself (read-only, user's own token)
+ * - The real security boundary is the API itself, scoped to the caller's own
+ *   token. The namespace includes writes as well as reads — see the note on
+ *   BLOCKED_PATTERNS for what that does and does not widen.
  */
 export async function executeCode(
   code: string,
