@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - 'mcp-v*'
+  # Finishes a release whose registry step failed after npm had published.
+  workflow_dispatch:
 
 jobs:
   release:
@@ -31,10 +33,35 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # Skips when the version is already on npm, so a re-run can finish the
+      # registry step without failing on "cannot publish over existing version".
       - name: Publish to npm
-        run: pnpm publish --access public --no-git-checks --provenance
+        run: |
+          VERSION=$(jq -r .version package.json)
+          if npm view "@gaffer-sh/mcp@$VERSION" version >/dev/null 2>&1; then
+            echo "@gaffer-sh/mcp@$VERSION is already on npm, skipping publish"
+          else
+            pnpm publish --access public --no-git-checks --provenance
+          fi
+
+      # npm accepts a publish and then processes it; the version is not served
+      # for a minute or two. The MCP Registry checks npm, so wait for it.
+      - name: Wait for npm to serve the version
+        run: |
+          VERSION=$(jq -r .version package.json)
+          for attempt in $(seq 1 40); do
+            if npm view "@gaffer-sh/mcp@$VERSION" version >/dev/null 2>&1; then
+              echo "npm serves $VERSION"
+              exit 0
+            fi
+            echo "waiting for npm to serve $VERSION (attempt $attempt)"
+            sleep 15
+          done
+          echo "::error::npm did not serve @gaffer-sh/mcp@$VERSION within 10 minutes"
+          exit 1
 
       - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v3
         with:
           generate_release_notes: true
