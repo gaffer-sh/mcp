@@ -37,6 +37,7 @@ export const getFlakyTestsInputSchema = {
 export const getFlakyTestsOutputSchema = {
   flakyTests: z.array(z.object({
     name: z.string(),
+    fullName: z.string().optional().describe('Tells apart entries that share a name, one per Playwright project'),
     flipRate: z.number(),
     flipCount: z.number(),
     totalRuns: z.number(),
@@ -60,6 +61,7 @@ export interface GetFlakyTestsInput {
 export interface GetFlakyTestsOutput {
   flakyTests: Array<{
     name: string
+    fullName?: string
     flipRate: number
     flipCount: number
     totalRuns: number
@@ -107,7 +109,8 @@ failure rate, and duration variability.
 
 Returns:
 - List of flaky tests sorted by flakinessScore (most flaky first), with:
-  - name: Test name
+  - name: Test name. Several entries can share one, one per Playwright project
+  - fullName: Suite path and title, e.g. "Login > signs in [webkit]". Pass it to get_test_history to see that project's runs only
   - flipRate: How often the test flips between pass/fail (0-1)
   - flipCount: Number of status transitions
   - totalRuns: Total test executions analyzed

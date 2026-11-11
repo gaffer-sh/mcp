@@ -6,12 +6,12 @@ MCP server for Gaffer. TypeScript, built with tsdown, published to npm as `@gaff
 
 This server is an **external API consumer**. It calls Gaffer's public `/api/v1/` endpoints over HTTP like any third-party client, and never bypasses the public API. If an endpoint does not support what a function needs, the fix belongs in the API, not here.
 
-The server runs in **code mode**: three MCP tools plus a `codemode` namespace of 16 functions that `execute_code` calls from sandboxed JavaScript. That keeps 16 tool definitions out of the client's context window and lets one execution chain several calls.
+The server runs in **code mode**: three MCP tools plus a `codemode` namespace of 17 functions that `execute_code` calls from sandboxed JavaScript. That keeps 17 tool definitions out of the client's context window and lets one execution chain several calls.
 
 | Path | What it holds |
 |---|---|
-| `src/index.ts` | MCP server, the three tool registrations, stdio transport |
-| `src/codemode/` | Registry, executor, type generation, keyword search |
+| `src/index.ts` | stdio entry point: builds the client from env and connects the server over stdio |
+| `src/codemode/` | MCP server and its three tool registrations (`server.ts`), registry, executor, type generation, keyword search. Exported as `@gaffer-sh/mcp/codemode` for hosts that serve it over HTTP |
 | `src/tools/` | One file per function: `inputSchema`, `execute`, `metadata` |
 | `src/api-client.ts` | HTTP client for the Gaffer API |
 | `src/types.ts` | Shared types |
@@ -47,4 +47,4 @@ Functions go in the codemode registry, not in the MCP tool list. Only add a firs
 
 ## Release
 
-The version appears in `package.json`, `src/index.ts`, and `server.json` (twice). All must match before publishing, and `server.json`'s `name` must equal `package.json`'s `mcpName`. The MCP registry rejects a mismatch outright. `docs-sync.test.ts` checks all of it.
+The version appears in `package.json`, `src/codemode/server.ts`, and `server.json` (twice). All must match before publishing, and `server.json`'s `name` must equal `package.json`'s `mcpName`. The MCP registry rejects a mismatch outright. `docs-sync.test.ts` checks all of it.

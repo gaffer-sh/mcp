@@ -72,13 +72,18 @@ export interface CompareTestMetricsInput {
 export type CompareTestMetricsOutput = CompareTestResponse
 
 /**
- * Execute compare_test_metrics tool
+ * Ensure both values of a before/after pair are non-empty strings.
  */
-export async function executeCompareTestMetrics(
-  client: GafferApiClient,
-  input: CompareTestMetricsInput,
-): Promise<CompareTestMetricsOutput> {
-  // Validate input - check for presence of required pairs
+function assertNonEmptyPair(pairLabel: string, before?: string, after?: string): void {
+  if (before!.trim().length === 0 || after!.trim().length === 0) {
+    throw new Error(`${pairLabel} must not be empty strings`)
+  }
+}
+
+/**
+ * Validate input - check for presence of required pairs and non-empty strings
+ */
+function assertValidCompareInput(input: CompareTestMetricsInput): void {
   const hasCommits = input.beforeCommit && input.afterCommit
   const hasRunIds = input.beforeRunId && input.afterRunId
 
@@ -86,18 +91,23 @@ export async function executeCompareTestMetrics(
     throw new Error('Must provide either (beforeCommit + afterCommit) or (beforeRunId + afterRunId)')
   }
 
-  // Validate non-empty strings
   if (hasCommits) {
-    if (input.beforeCommit!.trim().length === 0 || input.afterCommit!.trim().length === 0) {
-      throw new Error('beforeCommit and afterCommit must not be empty strings')
-    }
+    assertNonEmptyPair('beforeCommit and afterCommit', input.beforeCommit, input.afterCommit)
   }
 
   if (hasRunIds) {
-    if (input.beforeRunId!.trim().length === 0 || input.afterRunId!.trim().length === 0) {
-      throw new Error('beforeRunId and afterRunId must not be empty strings')
-    }
+    assertNonEmptyPair('beforeRunId and afterRunId', input.beforeRunId, input.afterRunId)
   }
+}
+
+/**
+ * Execute compare_test_metrics tool
+ */
+export async function executeCompareTestMetrics(
+  client: GafferApiClient,
+  input: CompareTestMetricsInput,
+): Promise<CompareTestMetricsOutput> {
+  assertValidCompareInput(input)
 
   const response = await client.compareTestMetrics({
     projectId: input.projectId,

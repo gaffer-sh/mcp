@@ -1,7 +1,7 @@
 {
   "name": "@gaffer-sh/mcp",
   "type": "module",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "mcpName": "sh.gaffer/mcp",
   "description": "MCP server for Gaffer test history - give your AI assistant memory of your tests",
   "license": "MIT",
@@ -23,6 +23,17 @@
     "cursor",
     "ai-assistant"
   ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./codemode": {
+      "types": "./dist/codemode/index.d.ts",
+      "import": "./dist/codemode/index.js"
+    },
+    "./package.json": "./package.json"
+  },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
@@ -45,7 +56,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@modelcontextprotocol/sdk": "^1.25.0",
     "zod": "^3.23.0"
   },
   "devDependencies": {

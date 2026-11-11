@@ -45,13 +45,13 @@ describe('rEADME stays in sync with the codemode registry', () => {
 })
 
 describe('version stays consistent across the package', () => {
-  it('src/index.ts reports the package.json version', () => {
+  it('src/codemode/server.ts reports the package.json version', () => {
     const { version } = JSON.parse(read('package.json')) as { version: string }
-    const indexTs = read('src/index.ts')
+    const serverTs = read('src/codemode/server.ts')
 
     // The McpServer constructor hardcodes the version; bumpp only touches
     // package.json, so these silently diverge without this assertion.
-    expect(indexTs).toContain(`version: '${version}'`)
+    expect(serverTs).toContain(`version: '${version}'`)
   })
 })
 

@@ -45,6 +45,7 @@ export const getTestRunDetailsOutputSchema = {
     failed: z.number(),
     skipped: z.number(),
     total: z.number(),
+    flaky: z.number().optional(),
   }),
   tests: z.array(z.object({
     name: z.string(),
@@ -54,6 +55,9 @@ export const getTestRunDetailsOutputSchema = {
     filePath: z.string().nullable(),
     error: z.string().nullable(),
     errorStack: z.string().nullable(),
+    suite: z.string().nullable().optional(),
+    line: z.number().nullable().optional(),
+    retryAttempt: z.number().nullable().optional(),
   })),
   pagination: z.object({
     total: z.number(),
@@ -82,6 +86,7 @@ export interface GetTestRunDetailsOutput {
     failed: number
     skipped: number
     total: number
+    flaky?: number
   }
   tests: Array<{
     name: string
@@ -91,6 +96,9 @@ export interface GetTestRunDetailsOutput {
     filePath: string | null
     error: string | null
     errorStack: string | null
+    suite?: string | null
+    line?: number | null
+    retryAttempt?: number | null
   }>
   pagination: {
     total: number
@@ -148,7 +156,7 @@ Returns:
 - branch: Git branch name (null if not recorded)
 - framework: Test framework (e.g., "playwright", "vitest")
 - createdAt: When the test run was created (ISO 8601)
-- summary: Overall counts (passed, failed, skipped, total)
+- summary: Overall counts (passed, failed, skipped, total, flaky)
 - tests: Array of individual test results with:
   - name: Short test name
   - fullName: Full test name including describe blocks
@@ -157,6 +165,9 @@ Returns:
   - filePath: Test file path (null if not recorded)
   - error: Error message for failed tests (null otherwise)
   - errorStack: Full stack trace for failed tests (null otherwise)
+  - suite: Enclosing suite or describe block (null if not recorded)
+  - line: Line number of the test in its file (null if not recorded)
+  - retryAttempt: Retry attempt that produced this result (null if not recorded)
 - pagination: Pagination info (total, limit, offset, hasMore)
 
 Use cases:

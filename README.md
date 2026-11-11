@@ -16,21 +16,68 @@ This MCP server connects AI coding assistants like Claude Code and Cursor to you
 ## Prerequisites
 
 1. A [Gaffer](https://gaffer.sh) account with test results uploaded
-2. An API Key from Account Settings > API Keys
+2. An API Key from Account Settings > API Keys (app.gaffer.sh/account/api-keys)
 
 ## Setup
 
-### Claude Code (CLI)
+There are two ways to connect. Use the hosted endpoint unless your client only supports local stdio servers.
 
-The easiest way to add the Gaffer MCP server is via the Claude Code CLI:
+| | Hosted endpoint | npm package |
+|---|---|---|
+| Install | Nothing | `npx` runs `@gaffer-sh/mcp` on your machine |
+| Credential | `Authorization: Bearer <key>` header | `GAFFER_API_KEY` environment variable |
+| `execute_code` runs | In an isolated sandbox with no network access | In a local Node process |
+| Functions | All 17, same as npm | All 17 |
+| Clients | Those that support remote HTTP servers | Any client that can start a stdio server |
+
+### Option 1: Hosted endpoint
+
+The endpoint is `https://app.gaffer.sh/mcp` (Streamable HTTP, `POST` only). Each credential is limited to 1,000 requests per hour. Requests without a valid key get a `401`, and requests over the limit get a `429` with a `Retry-After` header.
+
+#### Claude Code
 
 ```bash
-claude mcp add gaffer -e GAFFER_API_KEY=gaf_your_api_key_here -- npx -y @gaffer-sh/mcp
+claude mcp add --transport http gaffer https://app.gaffer.sh/mcp --header "Authorization: Bearer gaf_YOUR_KEY"
 ```
 
-### Claude Code (Manual)
+#### Cursor
 
-Alternatively, add to your Claude Code settings (`~/.claude.json` or project `.claude/settings.json`):
+Add to `.cursor/mcp.json` in your project, or `~/.cursor/mcp.json` for every project:
+
+```json
+{
+  "mcpServers": {
+    "gaffer": {
+      "url": "https://app.gaffer.sh/mcp",
+      "headers": {
+        "Authorization": "Bearer gaf_YOUR_KEY"
+      }
+    }
+  }
+}
+```
+
+#### Claude Desktop
+
+Claude Desktop reads `claude_desktop_config.json`, which starts local stdio servers. Use the npm package below.
+
+#### claude.ai on the web
+
+claude.ai connects to remote servers through Connectors, which sign in with OAuth rather than an API key. Gaffer does not support OAuth sign-in yet, so claude.ai on the web cannot connect today.
+
+### Option 2: npm package
+
+The package runs locally over stdio and reads your key from `GAFFER_API_KEY`.
+
+#### Claude Code (CLI)
+
+```bash
+claude mcp add gaffer -e GAFFER_API_KEY=gaf_YOUR_KEY -- npx -y @gaffer-sh/mcp
+```
+
+#### Claude Code (Manual)
+
+Add to your Claude Code settings (`~/.claude.json` or project `.claude/settings.json`):
 
 ```json
 {
@@ -39,14 +86,14 @@ Alternatively, add to your Claude Code settings (`~/.claude.json` or project `.c
       "command": "npx",
       "args": ["-y", "@gaffer-sh/mcp"],
       "env": {
-        "GAFFER_API_KEY": "gaf_your_api_key_here"
+        "GAFFER_API_KEY": "gaf_YOUR_KEY"
       }
     }
   }
 }
 ```
 
-### Cursor
+#### Cursor
 
 Add to `.cursor/mcp.json` in your project:
 
@@ -57,12 +104,36 @@ Add to `.cursor/mcp.json` in your project:
       "command": "npx",
       "args": ["-y", "@gaffer-sh/mcp"],
       "env": {
-        "GAFFER_API_KEY": "gaf_your_api_key_here"
+        "GAFFER_API_KEY": "gaf_YOUR_KEY"
       }
     }
   }
 }
 ```
+
+#### Claude Desktop
+
+Open **Settings > Developer > Edit Config**, or edit the file directly:
+
+- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+- Linux: `~/.config/Claude/claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "gaffer": {
+      "command": "npx",
+      "args": ["-y", "@gaffer-sh/mcp"],
+      "env": {
+        "GAFFER_API_KEY": "gaf_YOUR_KEY"
+      }
+    }
+  }
+}
+```
+
+Quit and restart Claude Desktop after saving. Node.js must be installed.
 
 ## How this server works
 
@@ -121,7 +192,7 @@ List all projects you have access to.
 
 Get the health metrics for a project.
 
-- **Input:** `projectId` (required), `days` (optional, default: 30)
+- **Input:** `projectId` (required for `gaf_` keys), `days` (optional, default: 30)
 - **Returns:** Health score (0-100), pass rate, test run count, flaky test count, trend
 - **Example:** "What's the health of my test suite?"
 
@@ -129,32 +200,32 @@ Get the health metrics for a project.
 
 Get the pass/fail history for a specific test.
 
-- **Input:** `projectId` (required), `testName` or `filePath` (one required), `limit` (optional)
-- **Returns:** History of runs with status, duration, branch, commit, errors
+- **Input:** `projectId` (required for `gaf_` keys), `testName`, `filePath` or `fullName` (at least one), `limit` (optional). `fullName` is the exact value from `get_flaky_tests` and keeps Playwright projects apart
+- **Returns:** History of runs with status, duration, branch, commit, and the failure `message` for failed runs
 - **Example:** "Is the login test flaky? Check its history"
 
 ### `get_flaky_tests`
 
 Get the list of flaky tests in a project.
 
-- **Input:** `projectId` (required), `threshold` (optional, default: 0.1), `days` (optional), `limit` (optional)
-- **Returns:** List of flaky tests with flip rates, transition counts, run counts
+- **Input:** `projectId` (required for `gaf_` keys), `threshold` (optional, default: 0.1), `days` (optional), `limit` (optional)
+- **Returns:** List of flaky tests with `name`, `fullName` (tells apart entries that share a name, one per Playwright project), flip rates, transition counts, run counts
 - **Example:** "Which tests are flaky in my project?"
 
 ### `list_test_runs`
 
 List recent test runs with optional filtering.
 
-- **Input:** `projectId` (required), `commitSha` (optional), `branch` (optional), `status` (optional), `limit` (optional)
-- **Returns:** List of test runs with pass/fail/skip counts, commit and branch info
+- **Input:** `projectId` (required for `gaf_` keys), `commitSha` (optional), `branch` (optional), `status` (optional), `limit` (optional), `offset` (optional, default: 0)
+- **Returns:** List of test runs with pass/fail/skip counts, commit and branch info, plus `pagination` (`total`, `hasMore`)
 - **Example:** "What tests failed in the last commit?"
 
 ### `get_test_run_details`
 
 Get parsed test results for a specific test run.
 
-- **Input:** `testRunId` (required), `projectId` (required), `status` (optional filter), `limit` (optional)
-- **Returns:** Individual test results with name, status, duration, file path, errors
+- **Input:** `testRunId` (required), `projectId` (required for `gaf_` keys), `status` (optional filter), `limit` (optional), `offset` (optional, default: 0)
+- **Returns:** Individual test results with name, status, duration, file path, `suite`, `line`, `retryAttempt`, error and full `errorStack`; a `summary` with passed/failed/skipped/flaky/total counts
 - **Example:** "Show me all failed tests from this test run"
 
 ### `get_report`
@@ -169,7 +240,7 @@ Get URLs for report files uploaded with a test run.
 
 Get a browser-navigable URL for viewing a test report.
 
-- **Input:** `projectId` (required), `testRunId` (required), `filename` (optional)
+- **Input:** `projectId` (required for `gaf_` keys), `testRunId` (required), `filename` (optional)
 - **Returns:** Signed URL valid for 30 minutes
 - **Example:** "Give me a link to view the test report"
 
@@ -177,7 +248,7 @@ Get a browser-navigable URL for viewing a test report.
 
 Get the slowest tests in a project, sorted by P95 duration.
 
-- **Input:** `projectId` (required), `days` (optional), `limit` (optional), `framework` (optional), `branch` (optional)
+- **Input:** `projectId` (required for `gaf_` keys), `days` (optional), `limit` (optional), `framework` (optional), `branch` (optional)
 - **Returns:** List of tests with average and P95 duration, run count
 - **Example:** "Which tests are slowing down my CI pipeline?"
 
@@ -185,7 +256,7 @@ Get the slowest tests in a project, sorted by P95 duration.
 
 Compare test metrics between two commits or test runs.
 
-- **Input:** `projectId` (required), `testName` (required), `beforeCommit`/`afterCommit` OR `beforeRunId`/`afterRunId`
+- **Input:** `projectId` (required for `gaf_` keys), `testName` (required), `beforeCommit`/`afterCommit` OR `beforeRunId`/`afterRunId`
 - **Returns:** Before/after metrics with duration change and percentage
 - **Example:** "Did my fix make this test faster?"
 
@@ -193,7 +264,7 @@ Compare test metrics between two commits or test runs.
 
 Get the coverage metrics summary for a project.
 
-- **Input:** `projectId` (required), `days` (optional, default: 30)
+- **Input:** `projectId` (required for `gaf_` keys), `days` (optional, default: 30)
 - **Returns:** Line/branch/function coverage percentages, trend, report count, lowest coverage files
 - **Example:** "What's our test coverage?"
 
@@ -201,7 +272,7 @@ Get the coverage metrics summary for a project.
 
 Get coverage metrics for specific files or paths.
 
-- **Input:** `projectId` (required), `filePath` (required - exact or partial match)
+- **Input:** `projectId` (required for `gaf_` keys), `filePath` (required - exact or partial match)
 - **Returns:** List of matching files with line/branch/function coverage
 - **Example:** "What's the coverage for our API routes?"
 
@@ -209,7 +280,7 @@ Get coverage metrics for specific files or paths.
 
 Get files with little or no test coverage.
 
-- **Input:** `projectId` (required), `maxCoverage` (optional, default: 10%), `limit` (optional)
+- **Input:** `projectId` (required for `gaf_` keys), `maxCoverage` (optional, default: 10%), `limit` (optional)
 - **Returns:** List of files below threshold sorted by coverage (lowest first)
 - **Example:** "Which files have no tests?"
 
@@ -217,7 +288,7 @@ Get files with little or no test coverage.
 
 Find code areas with both low coverage AND test failures (high risk).
 
-- **Input:** `projectId` (required), `days` (optional), `coverageThreshold` (optional, default: 80%)
+- **Input:** `projectId` (required for `gaf_` keys), `days` (optional), `coverageThreshold` (optional, default: 80%)
 - **Returns:** Risk areas ranked by score, with file path, coverage %, failure count
 - **Example:** "Where should we focus our testing efforts?"
 
@@ -225,7 +296,7 @@ Find code areas with both low coverage AND test failures (high risk).
 
 Group failed tests by root cause using error message similarity.
 
-- **Input:** `projectId` (required), `testRunId` (required)
+- **Input:** `projectId` (required for `gaf_` keys), `testRunId` (required)
 - **Returns:** Clusters of failed tests grouped by similar error messages, with representative error and test count
 - **Example:** "Are these 15 failures from the same bug?"
 
@@ -233,15 +304,15 @@ Group failed tests by root cause using error message similarity.
 
 Search past failures by error message, stack trace, or test name — or list every failure in the window.
 
-- **Input:** `query` (optional — omit to return all failures), `projectId` (required for `gaf_` keys), `searchIn` (optional: `errors`/`names`/`all`, default `all`), `days` (optional, default: 30), `branch` (optional), `limit` (optional, default: 20)
-- **Returns:** Matching failures with test name, error message, run and commit context, plus `truncated` when scan caps cut the list short
+- **Input:** `query` (optional — omit to return all failures), `projectId` (required for `gaf_` keys), `searchIn` (optional: `errors`/`names`/`all`, default `all`), `days` (optional, default: 30), `branch` (optional), `limit` (optional, default: 20), `offset` (optional, default: 0)
+- **Returns:** Matching failures with test name, error message, full `errorStack`, run and commit context, plus `pagination` (`limit`, `offset`, `hasMore`) and `truncated` when scan caps cut the list short
 - **Example:** "Have we seen this connection-refused error before?" / "What failed in the last 7 days?"
 
 ### `get_upload_status`
 
 Check if CI results have been uploaded and processed.
 
-- **Input:** `projectId` (required), `sessionId` (optional), `commitSha` (optional), `branch` (optional)
+- **Input:** `projectId` (required for `gaf_` keys), `sessionId` (optional), `commitSha` (optional), `branch` (optional)
 - **Returns:** Upload session(s) with processing status, linked test runs and coverage reports
 - **Example:** "Are my test results ready for commit abc123?"
 
@@ -370,7 +441,7 @@ get_coverage_for_file(filePath="lib/core")
 
 ### User API Keys (Recommended)
 
-User API Keys (`gaf_` prefix) provide read-only access to all projects across your organizations. Get your API Key from: **Account Settings > API Keys**
+User API Keys (`gaf_` prefix) cover every project your account can reach. They can read all of them and upload test results to any of them (`upload_test_results`, rate-limited to 300 per hour per project). Get your API Key from: **Account Settings > API Keys**
 
 ### Project Tokens
 

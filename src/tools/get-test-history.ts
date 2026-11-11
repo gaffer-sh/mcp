@@ -17,6 +17,10 @@ export const getTestHistoryInputSchema = {
     .string()
     .optional()
     .describe('File path containing the test'),
+  fullName: z
+    .string()
+    .optional()
+    .describe('Exact full name from get_flaky_tests (e.g. "Login > signs in [webkit]"); keeps Playwright projects apart'),
   limit: z
     .number()
     .int()
@@ -37,7 +41,7 @@ export const getTestHistoryOutputSchema = {
     commitSha: z.string().optional(),
     status: z.enum(['passed', 'failed', 'skipped', 'pending']),
     durationMs: z.number(),
-    message: z.string().optional(),
+    message: z.string().optional().describe('Failure message for failed runs; absent otherwise'),
   })),
   summary: z.object({
     totalRuns: z.number(),
@@ -51,6 +55,7 @@ export interface GetTestHistoryInput {
   projectId?: string
   testName?: string
   filePath?: string
+  fullName?: string
   limit?: number
 }
 
@@ -79,14 +84,15 @@ export async function executeGetTestHistory(
   client: GafferApiClient,
   input: GetTestHistoryInput,
 ): Promise<GetTestHistoryOutput> {
-  if (!input.testName && !input.filePath) {
-    throw new Error('Either testName or filePath is required')
+  if (!input.testName && !input.filePath && !input.fullName) {
+    throw new Error('One of testName, filePath or fullName is required')
   }
 
   const response = await client.getTestHistory({
     projectId: input.projectId,
     testName: input.testName,
     filePath: input.filePath,
+    fullName: input.fullName,
     limit: input.limit || 20,
   })
 
@@ -120,6 +126,8 @@ export const getTestHistoryMetadata = {
 Search by either:
 - testName: The exact name of the test (e.g., "should handle user login")
 - filePath: The file path containing the test (e.g., "tests/auth.test.ts")
+- fullName: The exact fullName from get_flaky_tests (e.g., "Login > signs in [webkit]"),
+  which keeps one Playwright project's runs apart from another's
 
 Returns:
 - History of test runs showing pass/fail status over time

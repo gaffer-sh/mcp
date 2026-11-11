@@ -60,7 +60,8 @@ export interface TestHistoryEntry {
     status: 'passed' | 'failed' | 'skipped' | 'pending'
     durationMs: number
     filePath?: string
-    message?: string
+    /** Failure message for failed entries, null otherwise. */
+    message?: string | null
   }
 }
 
@@ -78,6 +79,8 @@ export interface TestHistoryResponse {
 
 export interface FlakyTest {
   name: string
+  /** Suite path and title, plus ` [project]` for multi-project Playwright. Older APIs omit it. */
+  fullName?: string
   flipRate: number
   flipCount: number
   totalRuns: number
@@ -175,6 +178,10 @@ export interface TestCaseDetail {
   filePath: string | null
   error: string | null
   errorStack: string | null
+  /** Optional: older API deployments omit these. */
+  suite?: string | null
+  line?: number | null
+  retryAttempt?: number | null
 }
 
 export interface TestRunDetailsResponse {
@@ -188,6 +195,8 @@ export interface TestRunDetailsResponse {
     failed: number
     skipped: number
     total: number
+    /** Optional: older API deployments omit it. */
+    flaky?: number
   }
   tests: TestCaseDetail[]
   pagination: Pagination
@@ -409,6 +418,7 @@ export interface SearchFailureMatch {
   branch: string | null
   commitSha: string | null
   errorMessage: string | null
+  /** The full stack trace, not truncated. */
   errorStack: string | null
   createdAt: string
 }
@@ -423,6 +433,12 @@ export interface SearchFailuresResponse {
   truncated: boolean
   /** The query that was searched for, or null when every failure was returned. */
   query: string | null
+  /** Optional: older API deployments omit it. */
+  pagination?: {
+    limit: number
+    offset: number
+    hasMore: boolean
+  }
 }
 
 /**

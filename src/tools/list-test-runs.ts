@@ -28,6 +28,12 @@ export const listTestRunsInputSchema = {
     .max(100)
     .optional()
     .describe('Maximum number of test runs to return (default: 20)'),
+  offset: z
+    .number()
+    .int()
+    .min(0)
+    .optional()
+    .describe('Number of test runs to skip for pagination (default: 0)'),
 }
 
 /**
@@ -56,6 +62,7 @@ export interface ListTestRunsInput {
   branch?: string
   status?: 'passed' | 'failed'
   limit?: number
+  offset?: number
 }
 
 export interface ListTestRunsOutput {
@@ -88,6 +95,7 @@ export async function executeListTestRuns(
     branch: input.branch,
     status: input.status,
     limit: input.limit || 20,
+    offset: input.offset,
   })
 
   return {
@@ -120,6 +128,7 @@ Filter by:
 - commitSha: Filter by commit SHA (supports prefix matching)
 - branch: Filter by branch name
 - status: Filter by "passed" (no failures) or "failed" (has failures)
+- offset: Skip this many runs to page past the first \`limit\` (default: 0)
 
 Returns:
 - List of test runs with:

@@ -21,10 +21,7 @@ import type {
   UploadSessionDetailResponse,
   UploadSessionsResponse,
 } from './types.js'
-import { createRequire } from 'node:module'
-
-const require = createRequire(import.meta.url)
-const pkg = require('../package.json') as { version: string }
+import pkg from '../package.json' with { type: 'json' }
 
 // Request timeout in milliseconds (30 seconds)
 const REQUEST_TIMEOUT_MS = 30000
@@ -65,6 +62,17 @@ export function detectTokenType(token: string): TokenType {
 }
 
 /**
+ * Client options: the shared config plus hooks for hosts other than the stdio
+ * server. Omitting both behaves exactly like the stdio package.
+ */
+export interface GafferClientOptions extends GafferConfig {
+  /** Transport for every request. Defaults to global `fetch`; a host may serve it in-process. */
+  fetch?: typeof fetch
+  /** Sent as `X-Gaffer-Source`, which attributes the call server-side. Defaults to `mcp`. */
+  source?: string
+}
+
+/**
  * Gaffer API v1 client for MCP server
  *
  * Supports two authentication modes:
@@ -79,11 +87,16 @@ export class GafferApiClient {
   private baseUrl: string
   public readonly tokenType: TokenType
   private resolveProjectIdPromise: Promise<string> | null = null
+  private fetch: typeof fetch
+  private source: string
 
-  constructor(config: GafferConfig) {
+  constructor(config: GafferClientOptions) {
     this.apiKey = config.apiKey
     this.baseUrl = config.baseUrl.replace(/\/$/, '') // Remove trailing slash
     this.tokenType = detectTokenType(config.apiKey)
+    // Resolved per call, not captured, so a later-installed global fetch is still used.
+    this.fetch = config.fetch ?? ((input, init) => fetch(input, init))
+    this.source = config.source ?? 'mcp'
   }
 
   /**
@@ -179,14 +192,14 @@ export class GafferApiClient {
       const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
 
       try {
-        const response = await fetch(url.toString(), {
+        const response = await this.fetch(url.toString(), {
           method,
           headers: {
             'X-API-Key': this.apiKey,
             'Accept': 'application/json',
             'User-Agent': `gaffer-mcp/${pkg.version}`,
-            // Tags the write in Gaffer's audit log. Descriptive only.
-            'X-Gaffer-Source': 'mcp',
+            // Tags the request in Gaffer's audit log and analytics. Descriptive only.
+            'X-Gaffer-Source': this.source,
             ...(serializedBody !== undefined && { 'Content-Type': 'application/json' }),
           },
           ...(serializedBody !== undefined && { body: serializedBody }),
@@ -325,19 +338,22 @@ export class GafferApiClient {
     projectId?: string
     testName?: string
     filePath?: string
+    fullName?: string
     limit?: number
   }): Promise<TestHistoryResponse> {
     const testName = options.testName?.trim()
     const filePath = options.filePath?.trim()
+    const fullName = options.fullName?.trim()
 
-    if (!testName && !filePath) {
-      throw new Error('Either testName or filePath is required (and must not be empty)')
+    if (![testName, filePath, fullName].some(Boolean)) {
+      throw new Error('One of testName, filePath or fullName is required (and must not be empty)')
     }
 
     const projectId = await this.resolveProjectId(options.projectId)
     return this.request<TestHistoryResponse>(`/user/projects/${projectId}/test-history`, {
       ...(testName && { testName }),
       ...(filePath && { filePath }),
+      ...(fullName && { fullName }),
       ...(options.limit && { limit: options.limit }),
     })
   }
@@ -368,6 +384,7 @@ export class GafferApiClient {
     branch?: string
     status?: 'passed' | 'failed'
     limit?: number
+    offset?: number
   } = {}): Promise<TestRunsResponse> {
     const projectId = await this.resolveProjectId(options.projectId)
     return this.request<TestRunsResponse>(`/user/projects/${projectId}/test-runs`, {
@@ -375,6 +392,7 @@ export class GafferApiClient {
       ...(options.branch && { branch: options.branch }),
       ...(options.status && { status: options.status }),
       ...(options.limit && { limit: options.limit }),
+      ...(options.offset && { offset: options.offset }),
     })
   }
 
@@ -616,6 +634,7 @@ export class GafferApiClient {
     days?: number
     branch?: string
     limit?: number
+    offset?: number
   }): Promise<SearchFailuresResponse> {
     const projectId = await this.resolveProjectId(options.projectId)
     return this.request<SearchFailuresResponse>(
@@ -626,6 +645,7 @@ export class GafferApiClient {
         ...(options.days && { days: options.days }),
         ...(options.branch && { branch: options.branch }),
         ...(options.limit && { limit: options.limit }),
+        ...(options.offset && { offset: options.offset }),
       },
     )
   }
