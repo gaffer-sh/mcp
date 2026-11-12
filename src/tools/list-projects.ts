@@ -88,5 +88,5 @@ export const listProjectsMetadata = {
 Returns a list of projects with their IDs, names, and organization info.
 Use this to find project IDs for other tools like get_project_health.
 
-Requires a user API Key (gaf_). Get one from Account Settings in the Gaffer dashboard.`,
+Available with a user API Key (gaf_), which lists projects in every organization you belong to, and with OAuth sign-in, which lists the projects in the one organization you connected. Not available with a project token (gfr_).`,
 }

@@ -1,6 +1,6 @@
 # @gaffer-sh/mcp
 
-MCP (Model Context Protocol) server for [Gaffer](https://gaffer.sh) - give your AI assistant memory of your tests.
+MCP (Model Context Protocol) server for [Gaffer](https://gaffer.sh) - give your AI assistant memory of your tests. Full setup guide: [gaffer.sh/docs/mcp](https://gaffer.sh/docs/mcp/).
 
 ## What is this?
 
@@ -10,7 +10,7 @@ This MCP server connects AI coding assistants like Claude Code and Cursor to you
 - Look up the history of specific tests to understand stability
 - Get context about test failures when debugging
 - Analyze code coverage and identify untested areas
-- Browse all your projects (with user API Keys)
+- Browse your projects (with a user API Key or sign-in)
 - Access test report files (HTML reports, coverage, etc.)
 
 ## Prerequisites
@@ -21,6 +21,8 @@ This MCP server connects AI coding assistants like Claude Code and Cursor to you
 ## Setup
 
 There are two ways to connect. Use the hosted endpoint unless your client only supports local stdio servers.
+
+Most people need no npm package: Claude Code, claude.ai and Claude Desktop connect to the hosted endpoint and sign in.
 
 | | Hosted endpoint | npm package |
 |---|---|---|
@@ -180,7 +182,7 @@ This server uses **code mode**. Instead of exposing one MCP tool per API call, i
 |------|-------------|
 | `execute_code` | Run JavaScript against `codemode.<function>()`. Max 20 API calls, 30s timeout. |
 | `search_tools` | Find available functions by keyword. An empty query lists all of them. |
-| `list_projects` | List projects. Registered only when the token is a user API Key (`gaf_`). |
+| `list_projects` | List projects. Registered for a user API Key (`gaf_`) and for sign-in, not for a project token (`gfr_`). |
 
 ```javascript
 const health = await codemode.get_project_health({ projectId: "proj_abc" });
@@ -217,11 +219,13 @@ Every function except `upload_test_results` is read-only.
 
 ## Function Reference
 
+Every `days` parameter defaults to 30 and accepts up to 365. The server then reduces it to your plan's analytics window: 30 days on Free, 90 on Pro and 180 on Team. A larger value is not an error, and you get the window your plan allows.
+
 ### `list_projects`
 
-List all projects you have access to.
+List all projects you have access to. A user API Key lists projects in every organization you belong to. Sign-in lists the projects in the one organization you connected. Not available with a project token.
 
-- **Input:** `organizationId` (optional), `limit` (optional, default: 50)
+- **Input:** `organizationId` (optional), `limit` (optional, default: 50, max: 100)
 - **Returns:** List of projects with IDs, names, and organization info
 - **Example:** "What projects do I have in Gaffer?"
 
@@ -229,7 +233,7 @@ List all projects you have access to.
 
 Get the health metrics for a project.
 
-- **Input:** `projectId` (required for `gaf_` keys), `days` (optional, default: 30)
+- **Input:** `projectId` (required for `gaf_` keys), `days` (optional, default: 30, max: 365)
 - **Returns:** Health score (0-100), pass rate, test run count, flaky test count, trend
 - **Example:** "What's the health of my test suite?"
 
@@ -237,7 +241,7 @@ Get the health metrics for a project.
 
 Get the pass/fail history for a specific test.
 
-- **Input:** `projectId` (required for `gaf_` keys), `testName`, `filePath` or `fullName` (at least one), `limit` (optional). `fullName` is the exact value from `get_flaky_tests` and keeps Playwright projects apart
+- **Input:** `projectId` (required for `gaf_` keys), `testName`, `filePath` or `fullName` (at least one), `limit` (optional, default: 20, max: 100; at most 50 on the Free plan). `fullName` is the exact value from `get_flaky_tests` and keeps Playwright projects apart
 - **Returns:** History of runs with status, duration, branch, commit, and the failure `message` for failed runs
 - **Example:** "Is the login test flaky? Check its history"
 
@@ -245,15 +249,15 @@ Get the pass/fail history for a specific test.
 
 Get the list of flaky tests in a project.
 
-- **Input:** `projectId` (required for `gaf_` keys), `threshold` (optional, default: 0.1), `days` (optional), `limit` (optional)
-- **Returns:** List of flaky tests with `name`, `fullName` (tells apart entries that share a name, one per Playwright project), flip rates, transition counts, run counts
+- **Input:** `projectId` (required for `gaf_` keys), `threshold` (optional, default: 0.1), `days` (optional, default: 30, max: 365), `limit` (optional, default: 50, max: 100)
+- **Returns:** List of flaky tests with `name`, `fullName` (tells apart entries that share a name, one per Playwright project), flip rates, transition counts, run counts, `flakinessScore` and `lastSeen`
 - **Example:** "Which tests are flaky in my project?"
 
 ### `list_test_runs`
 
 List recent test runs with optional filtering.
 
-- **Input:** `projectId` (required for `gaf_` keys), `commitSha` (optional), `branch` (optional), `status` (optional), `limit` (optional), `offset` (optional, default: 0)
+- **Input:** `projectId` (required for `gaf_` keys), `commitSha` (optional), `branch` (optional), `status` (optional), `limit` (optional, default: 20, max: 100), `offset` (optional, default: 0)
 - **Returns:** List of test runs with pass/fail/skip counts, commit and branch info, plus `pagination` (`total`, `hasMore`)
 - **Example:** "What tests failed in the last commit?"
 
@@ -261,7 +265,7 @@ List recent test runs with optional filtering.
 
 Get parsed test results for a specific test run.
 
-- **Input:** `testRunId` (required), `projectId` (required for `gaf_` keys), `status` (optional filter), `limit` (optional), `offset` (optional, default: 0)
+- **Input:** `testRunId` (required), `projectId` (required for `gaf_` keys), `status` (optional filter), `limit` (optional, default: 100, max: 500), `offset` (optional, default: 0)
 - **Returns:** Individual test results with name, status, duration, file path, `suite`, `line`, `retryAttempt`, error and full `errorStack`; a `summary` with passed/failed/skipped/flaky/total counts
 - **Example:** "Show me all failed tests from this test run"
 
@@ -269,7 +273,7 @@ Get parsed test results for a specific test run.
 
 Get URLs for report files uploaded with a test run.
 
-- **Input:** `testRunId` (required)
+- **Input:** `testRunId` (required). Not available with a project token (`gfr_`)
 - **Returns:** List of files with filename, size, content type, download URL
 - **Example:** "Get the Playwright report for the latest test run"
 
@@ -285,7 +289,7 @@ Get a browser-navigable URL for viewing a test report.
 
 Get the slowest tests in a project, sorted by P95 duration.
 
-- **Input:** `projectId` (required for `gaf_` keys), `days` (optional), `limit` (optional), `framework` (optional), `branch` (optional)
+- **Input:** `projectId` (required for `gaf_` keys), `days` (optional, default: 30, max: 365), `limit` (optional, default: 20, max: 100), `framework` (optional), `branch` (optional)
 - **Returns:** List of tests with average and P95 duration, run count
 - **Example:** "Which tests are slowing down my CI pipeline?"
 
@@ -294,14 +298,14 @@ Get the slowest tests in a project, sorted by P95 duration.
 Compare test metrics between two commits or test runs.
 
 - **Input:** `projectId` (required for `gaf_` keys), `testName` (required), `beforeCommit`/`afterCommit` OR `beforeRunId`/`afterRunId`
-- **Returns:** Before/after metrics with duration change and percentage
+- **Returns:** Before/after metrics with duration change, percentage and whether the status changed
 - **Example:** "Did my fix make this test faster?"
 
 ### `get_coverage_summary`
 
 Get the coverage metrics summary for a project.
 
-- **Input:** `projectId` (required for `gaf_` keys), `days` (optional, default: 30)
+- **Input:** `projectId` (required for `gaf_` keys), `days` (optional, default: 30, max: 365)
 - **Returns:** Line/branch/function coverage percentages, trend, report count, lowest coverage files
 - **Example:** "What's our test coverage?"
 
@@ -310,14 +314,14 @@ Get the coverage metrics summary for a project.
 Get coverage metrics for specific files or paths.
 
 - **Input:** `projectId` (required for `gaf_` keys), `filePath` (required - exact or partial match)
-- **Returns:** List of matching files with line/branch/function coverage
+- **Returns:** Up to 10 matching files with line/branch/function coverage
 - **Example:** "What's the coverage for our API routes?"
 
 ### `get_untested_files`
 
 Get files with little or no test coverage.
 
-- **Input:** `projectId` (required for `gaf_` keys), `maxCoverage` (optional, default: 10%), `limit` (optional)
+- **Input:** `projectId` (required for `gaf_` keys), `maxCoverage` (optional, default: 10%), `limit` (optional, default: 20, max: 100)
 - **Returns:** List of files below threshold sorted by coverage (lowest first)
 - **Example:** "Which files have no tests?"
 
@@ -325,7 +329,7 @@ Get files with little or no test coverage.
 
 Find code areas with both low coverage AND test failures (high risk).
 
-- **Input:** `projectId` (required for `gaf_` keys), `days` (optional), `coverageThreshold` (optional, default: 80%)
+- **Input:** `projectId` (required for `gaf_` keys), `days` (optional, default: 30, max: 365), `coverageThreshold` (optional, default: 80%)
 - **Returns:** Risk areas ranked by score, with file path, coverage %, failure count
 - **Example:** "Where should we focus our testing efforts?"
 
@@ -341,7 +345,7 @@ Group failed tests by root cause using error message similarity.
 
 Search past failures by error message, stack trace, or test name — or list every failure in the window.
 
-- **Input:** `query` (optional — omit to return all failures), `projectId` (required for `gaf_` keys), `searchIn` (optional: `errors`/`names`/`all`, default `all`), `days` (optional, default: 30), `branch` (optional), `limit` (optional, default: 20), `offset` (optional, default: 0)
+- **Input:** `query` (optional, omit to return all failures), `projectId` (required for `gaf_` keys), `searchIn` (optional: `errors`/`names`/`all`, default `all`), `days` (optional, default: 30, max: 365), `branch` (optional), `limit` (optional, default: 20, max: 100), `offset` (optional, default: 0)
 - **Returns:** Matching failures with test name, error message, full `errorStack`, run and commit context, plus `pagination` (`limit`, `offset`, `hasMore`) and `truncated` when scan caps cut the list short
 - **Example:** "Have we seen this connection-refused error before?" / "What failed in the last 7 days?"
 
@@ -476,6 +480,14 @@ get_coverage_for_file(filePath="lib/core")
 
 ## Authentication
 
+There are three credentials.
+
+| Credential | Prefix | Scope | What it can do |
+|---|---|---|---|
+| OAuth sign-in | none | One organization, chosen at sign-in | Read functions only. No `upload_test_results`. `list_projects` lists that organization's projects. Hosted endpoint only. |
+| User API key | `gaf_` | Every project your account can reach | Read functions, plus `upload_test_results`. `list_projects` lists projects in every organization you belong to. |
+| Project token | `gfr_` | One project | Read functions and `upload_test_results` for that project. Omit `projectId`. |
+
 ### OAuth sign-in
 
 On the hosted endpoint, Claude Code, claude.ai and Claude Desktop sign in without a key. The grant covers one organization and is read-only: it cannot call `upload_test_results`. Revoke it under **Account Settings > AI assistants > Connected apps**.
@@ -486,7 +498,7 @@ User API Keys (`gaf_` prefix) cover every project your account can reach. They c
 
 ### Project Tokens
 
-Project Tokens (`gfr_` prefix) are designed for uploading test results and only provide access to a single project. When you use one, omit `projectId` — it resolves automatically. User API Keys are preferred for the MCP server because they enable `list_projects` and read across projects.
+Project Tokens (`gfr_` prefix) are designed for uploading test results and only provide access to a single project. When you use one, omit `projectId`: it resolves automatically. `list_projects` and `get_report` are not available with one. A user API Key or sign-in is preferred for the MCP server because both enable `list_projects`.
 
 ## Environment Variables
 

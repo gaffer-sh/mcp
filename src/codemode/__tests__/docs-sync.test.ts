@@ -32,6 +32,11 @@ describe('rEADME stays in sync with the codemode registry', () => {
     }
   })
 
+  it('states the registry size in its function-count sentence', () => {
+    const count = readme.match(/namespace of (\d+) functions/)?.[1]
+    expect(count, 'README needs a "namespace of N functions" sentence').toBe(String(registeredNames().length))
+  })
+
   it('documents the three real MCP tools', () => {
     for (const tool of ['execute_code', 'search_tools', 'list_projects']) {
       expect(readme).toContain(`\`${tool}\``)

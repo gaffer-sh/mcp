@@ -3,7 +3,7 @@
   "name": "sh.gaffer/mcp",
   "title": "Gaffer",
   "description": "Test analytics for AI agents: test history, flaky tests, failure clusters, coverage.",
-  "version": "0.10.1",
+  "version": "0.10.2",
   "websiteUrl": "https://gaffer.sh/docs/mcp/",
   "repository": {
     "url": "https://github.com/gaffer-sh/mcp",
@@ -36,7 +36,7 @@
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "@gaffer-sh/mcp",
-      "version": "0.10.1",
+      "version": "0.10.2",
       "transport": {
         "type": "stdio"
       },

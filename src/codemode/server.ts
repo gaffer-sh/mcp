@@ -244,7 +244,7 @@ function registerListProjects(server: McpServer, client: GafferApiClient): void 
  * Instead of individual tools, exposes 3 tools:
  * - execute_code: Run JavaScript that calls Gaffer API functions
  * - search_tools: Find available functions by keyword
- * - list_projects: List projects (user tokens only)
+ * - list_projects: List projects (user API keys and OAuth sign-in)
  *
  * This follows Cloudflare's "code mode" pattern for MCP servers. The caller
  * picks the transport (stdio, HTTP) and how `execute_code` runs.
@@ -254,7 +254,7 @@ export function createGafferMcpServer(client: GafferApiClient, runCode: CodeRunn
   registerAllTools(registry)
 
   const server = new McpServer(
-    { name: 'gaffer', version: '0.10.1' },
+    { name: 'gaffer', version: '0.10.2' },
     { instructions: serverInstructions(client) },
   )
 
