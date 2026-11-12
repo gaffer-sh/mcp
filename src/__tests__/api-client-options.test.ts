@@ -35,4 +35,9 @@ describe('gafferApiClient transport options', () => {
     expect(hostFetch.mock.calls[0]![0]).toBe('https://app.gaffer.sh/api/v1/user/projects')
     expect(headersOf(hostFetch)).toMatchObject({ 'X-API-Key': 'gaf_test', 'X-Gaffer-Source': 'mcp-hosted' })
   })
+
+  it('treats a hosted OAuth access token (gao_) as a user token', () => {
+    const client = new GafferApiClient({ apiKey: 'gao_test', baseUrl: 'https://app.gaffer.sh' })
+    expect(client.isUserToken()).toBe(true)
+  })
 })

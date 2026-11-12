@@ -67,6 +67,7 @@ describe('server.json satisfies the MCP registry contract', () => {
     description: string
     version: string
     packages: { identifier: string, version: string, transport: { type: string } }[]
+    remotes: { type: string, url: string, headers?: { name: string, isRequired?: boolean }[] }[]
   }
 
   it('name matches package.json mcpName', () => {
@@ -85,6 +86,11 @@ describe('server.json satisfies the MCP registry contract', () => {
   it('points at the published npm package over stdio', () => {
     expect(server.packages[0].identifier).toBe('@gaffer-sh/mcp')
     expect(server.packages[0].transport.type).toBe('stdio')
+  })
+
+  it('declares the hosted endpoint, with the API key header optional because OAuth also works', () => {
+    expect(server.remotes).toEqual([expect.objectContaining({ type: 'streamable-http', url: 'https://app.gaffer.sh/mcp' })])
+    expect(server.remotes[0].headers).toEqual([expect.objectContaining({ name: 'Authorization', isRequired: false })])
   })
 
   it('description fits the registry 100-character limit', () => {

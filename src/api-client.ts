@@ -47,9 +47,11 @@ export type TokenType = 'user' | 'project'
  * Detect token type from prefix
  * - gaf_ = user API Key (read-only, cross-project)
  * - gfr_ = Project Token (single project)
+ * - gao_ = OAuth access token from the hosted MCP sign-in. Behaves as a user
+ *   key scoped to one organization; the server refuses its writes.
  */
 export function detectTokenType(token: string): TokenType {
-  if (token.startsWith('gaf_')) {
+  if (token.startsWith('gaf_') || token.startsWith('gao_')) {
     return 'user'
   }
   if (token.startsWith('gfr_')) {

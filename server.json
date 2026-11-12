@@ -3,18 +3,40 @@
   "name": "sh.gaffer/mcp",
   "title": "Gaffer",
   "description": "Test analytics for AI agents: test history, flaky tests, failure clusters, coverage.",
-  "version": "0.10.0",
+  "version": "0.10.1",
   "websiteUrl": "https://gaffer.sh/docs/mcp/",
   "repository": {
     "url": "https://github.com/gaffer-sh/mcp",
     "source": "github"
   },
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://app.gaffer.sh/mcp",
+      "headers": [
+        {
+          "name": "Authorization",
+          "description": "Optional. Sign in with OAuth instead, or send a gaf_ user key or gfr_ project token from Account Settings > API Keys.",
+          "value": "Bearer {api_key}",
+          "isRequired": false,
+          "isSecret": true,
+          "variables": {
+            "api_key": {
+              "description": "gaf_ user key or gfr_ project token",
+              "isRequired": false,
+              "isSecret": true
+            }
+          }
+        }
+      ]
+    }
+  ],
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "@gaffer-sh/mcp",
-      "version": "0.10.0",
+      "version": "0.10.1",
       "transport": {
         "type": "stdio"
       },

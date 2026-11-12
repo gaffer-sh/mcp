@@ -16,7 +16,7 @@ This MCP server connects AI coding assistants like Claude Code and Cursor to you
 ## Prerequisites
 
 1. A [Gaffer](https://gaffer.sh) account with test results uploaded
-2. An API Key from Account Settings > API Keys (app.gaffer.sh/account/api-keys)
+2. For Claude Code, claude.ai and Claude Desktop on the hosted endpoint, nothing else: you sign in. For Cursor, CI and the npm package, an API Key from Account Settings > API Keys (app.gaffer.sh/account/api-keys)
 
 ## Setup
 
@@ -25,24 +25,69 @@ There are two ways to connect. Use the hosted endpoint unless your client only s
 | | Hosted endpoint | npm package |
 |---|---|---|
 | Install | Nothing | `npx` runs `@gaffer-sh/mcp` on your machine |
-| Credential | `Authorization: Bearer <key>` header | `GAFFER_API_KEY` environment variable |
+| Credential | OAuth sign-in, or `Authorization: Bearer <key>` header | `GAFFER_API_KEY` environment variable |
 | `execute_code` runs | In an isolated sandbox with no network access | In a local Node process |
-| Functions | All 17, same as npm | All 17 |
+| Functions | 17 with a key, same as npm. A signed-in connection has 16: it is read-only, so `upload_test_results` is listed but refused | All 17 |
 | Clients | Those that support remote HTTP servers | Any client that can start a stdio server |
 
 ### Option 1: Hosted endpoint
 
-The endpoint is `https://app.gaffer.sh/mcp` (Streamable HTTP, `POST` only). Each credential is limited to 1,000 requests per hour. Requests without a valid key get a `401`, and requests over the limit get a `429` with a `Retry-After` header.
+The endpoint is `https://app.gaffer.sh/mcp` (Streamable HTTP, `POST` only). Each credential is limited to 1,000 requests per hour. Requests without a valid credential get a `401`, and requests over the limit get a `429` with a `Retry-After` header.
 
-#### Claude Code
+#### Sign in, no key
+
+Claude Code, claude.ai and Claude Desktop sign in with OAuth. You do not create an API key.
+
+**Claude Code**
+
+```bash
+claude mcp add --transport http gaffer https://app.gaffer.sh/mcp
+```
+
+Then run `/mcp` inside Claude Code, select `gaffer`, and finish the sign-in in your browser.
+
+**claude.ai and Claude Desktop**
+
+1. Open **Customize > Connectors**, click **+ Add**, then **Add custom connector**. On Team and Enterprise plans an owner adds it under **Organization settings > Connectors**, and each member then clicks **Connect**.
+2. Enter a name and `https://app.gaffer.sh/mcp` as the URL, then click **Add** and sign in to Gaffer.
+3. On the consent page, pick the organization to connect and approve.
+
+Anthropic's steps for [custom connectors](https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp) are the reference if the menu names change.
+
+**Share it with your team**
+
+Commit this `.mcp.json` at the root of your repository. It holds no secret. Each teammate signs in once with `/mcp` and Claude Code asks them to approve the project server first.
+
+```json
+{
+  "mcpServers": {
+    "gaffer": {
+      "type": "http",
+      "url": "https://app.gaffer.sh/mcp"
+    }
+  }
+}
+```
+
+**What signing in grants**
+
+- Access to one organization, the one you pick on the consent page. To use another organization, connect again and pick it.
+- Read access only. A signed-in assistant can read test runs, failures, flaky tests and coverage. It cannot call `upload_test_results`.
+- The same limit of 1,000 requests per hour, counted per connected app.
+
+To revoke access, open **Account Settings > AI assistants** at [app.gaffer.sh/account/ai-assistants](https://app.gaffer.sh/account/ai-assistants) and click **Disconnect** next to the app under **Connected apps**.
+
+#### With an API key
+
+Use a key for CI, Cursor, or if you prefer one. A key can also upload results.
+
+Claude Code:
 
 ```bash
 claude mcp add --transport http gaffer https://app.gaffer.sh/mcp --header "Authorization: Bearer gaf_YOUR_KEY"
 ```
 
-#### Cursor
-
-Add to `.cursor/mcp.json` in your project, or `~/.cursor/mcp.json` for every project:
+Cursor: add to `.cursor/mcp.json` in your project, or `~/.cursor/mcp.json` for every project:
 
 ```json
 {
@@ -56,14 +101,6 @@ Add to `.cursor/mcp.json` in your project, or `~/.cursor/mcp.json` for every pro
   }
 }
 ```
-
-#### Claude Desktop
-
-Claude Desktop reads `claude_desktop_config.json`, which starts local stdio servers. Use the npm package below.
-
-#### claude.ai on the web
-
-claude.ai connects to remote servers through Connectors, which sign in with OAuth rather than an API key. Gaffer does not support OAuth sign-in yet, so claude.ai on the web cannot connect today.
 
 ### Option 2: npm package
 
@@ -439,7 +476,11 @@ get_coverage_for_file(filePath="lib/core")
 
 ## Authentication
 
-### User API Keys (Recommended)
+### OAuth sign-in
+
+On the hosted endpoint, Claude Code, claude.ai and Claude Desktop sign in without a key. The grant covers one organization and is read-only: it cannot call `upload_test_results`. Revoke it under **Account Settings > AI assistants > Connected apps**.
+
+### User API Keys
 
 User API Keys (`gaf_` prefix) cover every project your account can reach. They can read all of them and upload test results to any of them (`upload_test_results`, rate-limited to 300 per hour per project). Get your API Key from: **Account Settings > API Keys**
 

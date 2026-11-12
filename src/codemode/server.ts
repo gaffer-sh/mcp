@@ -254,7 +254,7 @@ export function createGafferMcpServer(client: GafferApiClient, runCode: CodeRunn
   registerAllTools(registry)
 
   const server = new McpServer(
-    { name: 'gaffer', version: '0.10.0' },
+    { name: 'gaffer', version: '0.10.1' },
     { instructions: serverInstructions(client) },
   )
 
