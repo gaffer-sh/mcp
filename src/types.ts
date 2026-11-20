@@ -182,6 +182,19 @@ export interface TestCaseDetail {
   suite?: string | null
   line?: number | null
   retryAttempt?: number | null
+  /** ISO 8601 UTC; present only when the report recorded it (Playwright JSON). */
+  startedAt?: string
+  stoppedAt?: string
+  workerIndex?: number
+  /** Playwright JSON only; omitted when the test attached nothing. */
+  attachments?: TestAttachment[]
+}
+
+/** `file` is a filename within the run's upload, or null when it was not uploaded. */
+export interface TestAttachment {
+  name: string
+  contentType: string
+  file: string | null
 }
 
 export interface TestRunDetailsResponse {
@@ -510,4 +523,18 @@ export interface IngestPayload {
  */
 export interface IngestResponse {
   uploadSessionId: string
+}
+
+/** Response from GET .../test-runs/:testRunId/logs without `file`: the run's log files. */
+export interface LogFilesResponse {
+  files: Array<{ file: string, size: number }>
+}
+
+/** Response from GET .../test-runs/:testRunId/logs with `file`: one page of lines. */
+export interface LogLinesResponse {
+  file: string
+  size: number
+  lines: Array<{ offset: number, text: string }>
+  nextAfter: number | null
+  truncated: boolean
 }

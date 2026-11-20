@@ -74,6 +74,12 @@ import {
 } from '../tools/get-test-run-details.js'
 
 import {
+  executeGetTestRunLogs,
+  getTestRunLogsInputSchema,
+  getTestRunLogsMetadata,
+} from '../tools/get-test-run-logs.js'
+
+import {
   executeGetUntestedFiles,
   getUntestedFilesInputSchema,
   getUntestedFilesMetadata,
@@ -156,6 +162,13 @@ const TOOLS: ToolRegistration[] = [
     execute: executeGetTestRunDetails,
     category: 'testing',
     keywords: ['details', 'results', 'errors', 'stack traces', 'test cases'],
+  },
+  {
+    metadata: getTestRunLogsMetadata,
+    inputSchema: getTestRunLogsInputSchema,
+    execute: executeGetTestRunLogs,
+    category: 'reports',
+    keywords: ['logs', 'backend', 'server log', 'grep', 'lines'],
   },
   {
     metadata: getFailureClustersMetadata,

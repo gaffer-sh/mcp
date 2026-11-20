@@ -11,6 +11,8 @@ import type {
   GafferConfig,
   IngestPayload,
   IngestResponse,
+  LogFilesResponse,
+  LogLinesResponse,
   ProjectsResponse,
   ReportResponse,
   SearchFailuresResponse,
@@ -648,6 +650,33 @@ export class GafferApiClient {
         ...(options.branch && { branch: options.branch }),
         ...(options.limit && { limit: options.limit }),
         ...(options.offset && { offset: options.offset }),
+      },
+    )
+  }
+
+  /**
+   * List a test run's attached log files, or read one page of one with `file`
+   */
+  async getTestRunLogs(options: {
+    projectId?: string
+    testRunId: string
+    file?: string
+    q?: string
+    after?: number
+    limit?: number
+  }): Promise<LogFilesResponse | LogLinesResponse> {
+    if (!options.testRunId) {
+      throw new Error('testRunId is required')
+    }
+
+    const projectId = await this.resolveProjectId(options.projectId)
+    return this.request<LogFilesResponse | LogLinesResponse>(
+      `/user/projects/${projectId}/test-runs/${options.testRunId}/logs`,
+      {
+        ...(options.file && { file: options.file }),
+        ...(options.q && { q: options.q }),
+        ...(options.after !== undefined && { after: options.after }),
+        ...(options.limit !== undefined && { limit: options.limit }),
       },
     )
   }

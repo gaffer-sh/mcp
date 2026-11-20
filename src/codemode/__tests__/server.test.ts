@@ -39,7 +39,7 @@ describe('createGafferMcpServer over stateless HTTP', () => {
 
     const [code, namespace] = runCode.mock.calls[0]!
     expect(code).toBe('return 1')
-    expect(Object.keys(namespace)).toHaveLength(17)
+    expect(Object.keys(namespace)).toHaveLength(18)
     expect(JSON.parse(result.content[0].text)).toEqual({ result: { ok: true }, logs: ['hi'], durationMs: 3 })
   })
 

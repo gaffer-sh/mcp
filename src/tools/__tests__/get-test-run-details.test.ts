@@ -54,4 +54,17 @@ describe('get_test_run_details', () => {
     expect(result.tests[0]).toMatchObject({ suite: 'auth', line: 25, retryAttempt: 2 })
     expect(outputSchema.safeParse(result).success).toBe(true)
   })
+
+  it('passes each test\'s attachments through, including an unuploaded file', async () => {
+    const attachments = [
+      { name: 'trace', contentType: 'application/zip', file: 'login-chromium/trace.zip' },
+      { name: 'screenshot', contentType: 'image/png', file: null },
+    ]
+    const client = clientReturning({ passed: 0, failed: 1, skipped: 0, total: 1 }, { ...failedTest, attachments })
+
+    const result = await executeGetTestRunDetails(client, { testRunId: 'rpt-1' })
+
+    expect(result.tests[0]!.attachments).toEqual(attachments)
+    expect(outputSchema.parse(result).tests[0]!.attachments).toEqual(attachments)
+  })
 })

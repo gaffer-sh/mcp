@@ -4,7 +4,7 @@ MCP (Model Context Protocol) server for [Gaffer](https://gaffer.sh) - give your 
 
 ## What is this?
 
-This MCP server connects AI coding assistants like Claude Code and Cursor to your Gaffer test history and coverage data. It runs in code mode: three MCP tools over a namespace of 17 functions — 16 read-only analytics functions plus `upload_test_results`. It allows AI to:
+This MCP server connects AI coding assistants like Claude Code and Cursor to your Gaffer test history and coverage data. It runs in code mode: three MCP tools over a namespace of 18 functions — 17 read-only analytics functions plus `upload_test_results`. It allows AI to:
 
 - Check your project's test health (pass rate, flaky tests, trends)
 - Look up the history of specific tests to understand stability
@@ -29,7 +29,7 @@ Most people need no npm package: Claude Code, claude.ai and Claude Desktop conne
 | Install | Nothing | `npx` runs `@gaffer-sh/mcp` on your machine |
 | Credential | OAuth sign-in, or `Authorization: Bearer <key>` header | `GAFFER_API_KEY` environment variable |
 | `execute_code` runs | In an isolated sandbox with no network access | In a local Node process |
-| Functions | 17 with a key, same as npm. A signed-in connection has 16: it is read-only, so `upload_test_results` is listed but refused | All 17 |
+| Functions | 18 with a key, same as npm. A signed-in connection has 17: it is read-only, so `upload_test_results` is listed but refused | All 18 |
 | Clients | Those that support remote HTTP servers | Any client that can start a stdio server |
 
 ### Option 1: Hosted endpoint
@@ -211,6 +211,7 @@ return { health };
 | `get_untested_files` | coverage | Files below a coverage threshold |
 | `find_uncovered_failure_areas` | coverage | Files with low coverage AND test failures |
 | `get_report` | reports | Report file URLs for a test run |
+| `get_test_run_logs` | reports | List a run's attached log files, or read one a page at a time with a text filter |
 | `get_report_browser_url` | reports | Signed browser-navigable report URL (30 min) |
 | `get_upload_status` | uploads | Whether CI results are uploaded and processed |
 | `upload_test_results` | uploads | Upload test results (**write**) — rate-limited and audit-logged |
@@ -266,8 +267,16 @@ List recent test runs with optional filtering.
 Get parsed test results for a specific test run.
 
 - **Input:** `testRunId` (required), `projectId` (required for `gaf_` keys), `status` (optional filter), `limit` (optional, default: 100, max: 500), `offset` (optional, default: 0)
-- **Returns:** Individual test results with name, status, duration, file path, `suite`, `line`, `retryAttempt`, error and full `errorStack`; a `summary` with passed/failed/skipped/flaky/total counts
+- **Returns:** Individual test results with name, status, duration, file path, `suite`, `line`, `retryAttempt`, error, full `errorStack` and `attachments` (`name`, `contentType`, and `file`: a filename within the run's upload, or `null` if it was not uploaded); a `summary` with passed/failed/skipped/flaky/total counts
 - **Example:** "Show me all failed tests from this test run"
+
+### `get_test_run_logs`
+
+Read the log files attached to a test run (backend or service logs uploaded with the results) a page at a time, without downloading the file.
+
+- **Input:** `testRunId` (required), `projectId` (required for `gaf_` keys), `file` (optional; omit to list the run's log files), `q` (optional, case-insensitive substring), `after` (optional byte offset, default: 0), `limit` (optional, default: 200, max: 1000)
+- **Returns:** Without `file`: `files` (`file`, `size`). With `file`: `lines` (`offset`, `text`), `nextAfter` (byte offset for the next call, `null` at end of file) and `truncated` (the per-call scan budget ran out; call again with `nextAfter`)
+- **Example:** "Find the backend errors logged during this failing run"
 
 ### `get_report`
 

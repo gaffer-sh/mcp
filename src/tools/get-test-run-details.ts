@@ -1,4 +1,5 @@
 import type { GafferApiClient } from '../api-client.js'
+import type { TestAttachment } from '../types.js'
 import { z } from 'zod'
 
 /**
@@ -58,6 +59,14 @@ export const getTestRunDetailsOutputSchema = {
     suite: z.string().nullable().optional(),
     line: z.number().nullable().optional(),
     retryAttempt: z.number().nullable().optional(),
+    startedAt: z.string().optional(),
+    stoppedAt: z.string().optional(),
+    workerIndex: z.number().optional(),
+    attachments: z.array(z.object({
+      name: z.string(),
+      contentType: z.string(),
+      file: z.string().nullable(),
+    })).optional(),
   })),
   pagination: z.object({
     total: z.number(),
@@ -99,6 +108,10 @@ export interface GetTestRunDetailsOutput {
     suite?: string | null
     line?: number | null
     retryAttempt?: number | null
+    startedAt?: string
+    stoppedAt?: string
+    workerIndex?: number
+    attachments?: TestAttachment[]
   }>
   pagination: {
     total: number
@@ -168,6 +181,12 @@ Returns:
   - suite: Enclosing suite or describe block (null if not recorded)
   - line: Line number of the test in its file (null if not recorded)
   - retryAttempt: Retry attempt that produced this result (null if not recorded)
+  - startedAt / stoppedAt: Wall-clock window of the test, ISO 8601 UTC (omitted unless the report records it; Playwright JSON does)
+  - workerIndex: 0-based Playwright worker that ran the test (omitted if not recorded)
+  - attachments: Files the test attached on its last attempt (Playwright JSON only; omitted when none), each with:
+    - name: Attachment name as the reporter wrote it (e.g. "trace", "screenshot", "video")
+    - contentType: MIME type
+    - file: Filename within this run's upload (a path, not a URL), or null when the file was not uploaded
 - pagination: Pagination info (total, limit, offset, hasMore)
 
 Use cases:

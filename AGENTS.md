@@ -6,7 +6,7 @@ MCP server for Gaffer. TypeScript, built with tsdown, published to npm as `@gaff
 
 This server is an **external API consumer**. It calls Gaffer's public `/api/v1/` endpoints over HTTP like any third-party client, and never bypasses the public API. If an endpoint does not support what a function needs, the fix belongs in the API, not here.
 
-The server runs in **code mode**: three MCP tools plus a `codemode` namespace of 17 functions that `execute_code` calls from sandboxed JavaScript. That keeps 17 tool definitions out of the client's context window and lets one execution chain several calls.
+The server runs in **code mode**: three MCP tools plus a `codemode` namespace of 18 functions that `execute_code` calls from sandboxed JavaScript. That keeps 18 tool definitions out of the client's context window and lets one execution chain several calls.
 
 | Path | What it holds |
 |---|---|

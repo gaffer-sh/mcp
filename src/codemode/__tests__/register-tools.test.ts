@@ -8,7 +8,7 @@ describe('registerAllTools', () => {
     registerAllTools(registry)
 
     const all = registry.getAll()
-    expect(all).toHaveLength(17)
+    expect(all).toHaveLength(18)
   })
 
   it('registers key tool names', () => {
